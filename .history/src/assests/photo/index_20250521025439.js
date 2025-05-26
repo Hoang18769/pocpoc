@@ -1,0 +1,1 @@
+import avt from "@/assests/photo/Afro"
