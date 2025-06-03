@@ -1,0 +1,24 @@
+import ProfileHeader from "@/components/social-app-component/ProfileHeader"
+import PostCard from "@/components/social-app-component/Postcard"
+const postSample = {
+  user: {
+    name: "Jane Doe",
+  },
+  time: "2 hours ago",
+  content: "Exploring the mountains today! 🏔️ The view is breathtaking and I feel so alive.",
+  image: "/images/mountains.jpg", // bạn có thể thay bằng URL thực tế
+  likes: 132,
+  latestComment: {
+    user: "johnsmith",
+    content: "Wow! Looks amazing 😍",
+  },
+  totalComments: 24,
+}
+export default function ProfilePage() {
+  return (
+    <main className=" max-w-4xl mx-auto mt-4">
+      <ProfileHeader />
+      
+    </main>
+  )
+}
