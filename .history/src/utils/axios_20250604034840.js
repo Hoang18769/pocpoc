@@ -77,99 +77,11 @@ api.interceptors.response.use(
   async (error) => {
     console.log("🚨 Response interceptor triggered:", error?.response?.status, error?.config?.url);
     
-    // THÊM DEBUG CHI TIẾT
-    console.log("🔍 Full error object:", {
-      message: error.message,
-      code: error.code,
-      response: error.response ? {
-        status: error.response.status,
-        statusText: error.response.statusText,
-        data: error.response.data,
-        headers: error.response.headers
-      } : null,
-      request: error.request ? {
-        readyState: error.request.readyState,
-        status: error.request.status,
-        responseURL: error.request.responseURL
-      } : null,
-      config: error.config ? {
-        method: error.config.method,
-        url: error.config.url,
-        baseURL: error.config.baseURL,
-        headers: error.config.headers
-      } : null
-    });
-    
     const originalRequest = error.config;
 
-    // SPECIAL HANDLING: Network error nhưng có thể là 401
+    // Kiểm tra nếu request bị lỗi không có response (network error)
     if (!error.response) {
       console.error("❌ Network error:", error.message);
-      console.error("❌ Error code:", error.code);
-      console.error("❌ Request URL:", originalRequest?.url);
-      console.error("❌ Base URL:", originalRequest?.baseURL);
-      console.error("❌ Full URL:", `${originalRequest?.baseURL}${originalRequest?.url}`);
-      
-      // FIX: Nếu là ERR_NETWORK và không phải public endpoint, thử refresh token
-      if (
-        error.code === 'ERR_NETWORK' &&
-        !originalRequest._retry &&
-        !isPublicEndpoint(originalRequest?.url) &&
-        !originalRequest.skipAuth &&
-        localStorage.getItem("accessToken") // Chỉ thử nếu có token
-      ) {
-        console.warn("🔄 Network error có thể do token hết hạn, thử refresh...");
-        
-        originalRequest._retry = true;
-        
-        if (isRefreshing) {
-          return new Promise((resolve, reject) => {
-            addRefreshSubscriber((newToken) => {
-              if (newToken) {
-                originalRequest.headers["Authorization"] = `Bearer ${newToken}`;
-                resolve(api(originalRequest));
-              } else {
-                reject(error);
-              }
-            });
-          });
-        }
-        
-        isRefreshing = true;
-        
-        try {
-          const refreshInstance = axios.create({
-            baseURL: `${process.env.NEXT_PUBLIC_API_URL}`,
-            withCredentials: true,
-            timeout: 15000
-          });
-
-          const refreshRes = await refreshInstance.post('/v1/auth/refresh', {});
-          const newToken = refreshRes?.data?.body?.token;
-
-          if (newToken) {
-            console.log("✅ Network error -> Refresh thành công");
-            localStorage.setItem("accessToken", newToken);
-            api.defaults.headers.common["Authorization"] = `Bearer ${newToken}`;
-            originalRequest.headers["Authorization"] = `Bearer ${newToken}`;
-            
-            onTokenRefreshed(newToken);
-            return api(originalRequest);
-          }
-        } catch (refreshError) {
-          console.error("❌ Network error -> Refresh thất bại:", refreshError);
-          localStorage.removeItem("accessToken");
-          delete api.defaults.headers.common["Authorization"];
-          onTokenRefreshed(null);
-          
-          if (typeof window !== 'undefined') {
-            setTimeout(() => window.location.href = "/register", 100);
-          }
-        } finally {
-          isRefreshing = false;
-        }
-      }
-      
       return Promise.reject(error);
     }
 

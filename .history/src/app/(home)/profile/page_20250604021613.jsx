@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import ProfileHeader from "@/components/social-app-component/ProfileHeader"
 import PostCard from "@/components/social-app-component/Postcard"
 import api from "@/utils/axios"
-import axios from "axios"
+
 export default function ProfilePage() {
   const [profileData, setProfileData] = useState(null)
   const username = typeof window !== "undefined" ? localStorage.getItem("username") : null

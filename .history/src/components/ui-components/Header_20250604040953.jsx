@@ -6,16 +6,17 @@ import Badge from "@/components/ui-components/Badge";
 import ThemeToggle from "./Themetoggle";
 import { useRouter } from "next/navigation";
 import axios from "axios";
-import { setAuthToken } from "@/utils/axios";
 
 export default function Header({ className = "" }) {
   const router = useRouter();
 
   const handleLogout = async () => {
-    const token = localStorage.getItem("accessToken");
+    const token = localStorage.getItem("AccessToken");
     try {
       const res=await axios.delete(`${process.env.NEXT_PUBLIC_API_URL}/v1/auth/logout`, {
-
+        // headers: {
+        //   Authorization: `Bearer ${token}`,
+        // },
       });
       if(res.data.code===200){
         console.log(res);
@@ -23,8 +24,7 @@ export default function Header({ className = "" }) {
     } catch (err) {
       console.error("Logout failed:", err.response?.data || err.message);
     } finally {
-      localStorage.removeItem("accessToken");
-      setAuthToken(null);
+      localStorage.removeItem("token");
       router.push("/register");
     }
   };

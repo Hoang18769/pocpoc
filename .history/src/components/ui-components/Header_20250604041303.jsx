@@ -24,7 +24,6 @@ export default function Header({ className = "" }) {
       console.error("Logout failed:", err.response?.data || err.message);
     } finally {
       localStorage.removeItem("accessToken");
-      setAuthToken(null);
       router.push("/register");
     }
   };

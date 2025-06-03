@@ -299,7 +299,7 @@ export function setAuthToken(token) {
     localStorage.removeItem("accessToken");
     delete api.defaults.headers.common["Authorization"];
     console.log("🗑️ Đã xóa token");
-  }
+  }a
 }
 
 // Hàm để lấy token hiện tại

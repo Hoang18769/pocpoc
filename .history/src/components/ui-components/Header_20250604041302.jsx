@@ -6,7 +6,7 @@ import Badge from "@/components/ui-components/Badge";
 import ThemeToggle from "./Themetoggle";
 import { useRouter } from "next/navigation";
 import axios from "axios";
-import { setAuthToken } from "@/utils/axios";
+import setA
 
 export default function Header({ className = "" }) {
   const router = useRouter();
@@ -24,7 +24,6 @@ export default function Header({ className = "" }) {
       console.error("Logout failed:", err.response?.data || err.message);
     } finally {
       localStorage.removeItem("accessToken");
-      setAuthToken(null);
       router.push("/register");
     }
   };

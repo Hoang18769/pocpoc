@@ -101,22 +101,22 @@ export default function EditProfileModal({ profileData, onSave }) {
       }
 
       // 3. Update birthday
-      // if (formData.birthday !== profileData.birthday) {
-      //   console.log("🔄 Updating birthday...", {
-      //     old: profileData.birthday,
-      //     new: formData.birthday
-      //   })
+      if (formData.birthday !== profileData.birthday) {
+        console.log("🔄 Updating birthday...", {
+          old: profileData.birthday,
+          new: formData.birthday
+        })
         
-      //   try {
-      //     const birthdayResponse = await api.patch(`/v1/users/update-birthdate?birthdate=${encodeURIComponent(formData.birthday)}`)
-      //     console.log("✅ Birthday update response:", birthdayResponse.data)
-      //     addSuccessMessage("Birthday updated successfully")
-      //   } catch (err) {
-      //     console.error("❌ Failed to update birthday:", err)
-      //     console.error("Response data:", err.response?.data)
-      //     showError("birthday", err.response?.data?.message || "Failed to update birthday")
-      //   }
-      // }
+        try {
+          const birthdayResponse = await api.patch(`/v1/users/update-birthdate?birthdate=${encodeURIComponent(formData.birthday)}`)
+          console.log("✅ Birthday update response:", birthdayResponse.data)
+          addSuccessMessage("Birthday updated successfully")
+        } catch (err) {
+          console.error("❌ Failed to update birthday:", err)
+          console.error("Response data:", err.response?.data)
+          showError("birthday", err.response?.data?.message || "Failed to update birthday")
+        }
+      }
 
       // 4. Update bio
       if (formData.bio !== profileData.bio) {

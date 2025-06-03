@@ -13,7 +13,7 @@ import Connectimg from "@/assests/photo/Connect.jpg"
 import Link from "next/link"
 import api from "@/utils/axios"
 import { jwtDecode } from "jwt-decode";
-import axios from "axios"
+import axi
 
 export default function AuthPage() {
   const [mode, setMode] = useState("login") // "login" hoặc "register"
@@ -116,17 +116,15 @@ export default function AuthPage() {
 
       setLoading(true)
       try {
-        const res = await api.post(`/v1/auth/login`, { email, password })
+        const res = await axios.post("localhost:80/v1/auth/login", { email, password })
         if (res.data.code === 200) {
           if (res.data.body.token) {           
             const token = res.data.body.token;
-            console.log(token)
             localStorage.setItem("AccessToken", token);
             const decoded = jwtDecode(token);
-            console.log(decoded)
             const username=decoded.username;
             localStorage.setItem("username",decoded.username );
-            //console.log(username)
+            console.log(username)
           }
           //console.log(res.data)
           setMessage("✅ Đăng nhập thành công!")

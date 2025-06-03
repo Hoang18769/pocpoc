@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import ProfileHeader from "@/components/social-app-component/ProfileHeader"
 import PostCard from "@/components/social-app-component/Postcard"
 import api from "@/utils/axios"
-import axios from "axios"
+
 export default function ProfilePage() {
   const [profileData, setProfileData] = useState(null)
   const username = typeof window !== "undefined" ? localStorage.getItem("username") : null
@@ -13,7 +13,7 @@ export default function ProfilePage() {
     const fetchProfile = async () => {
       if (!username) return
       try {
-        const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/v1/users/${username}`, {
+        const res = await api.get(`${process.env.NEXT_PUBLIC_API_URL}/v1/auth/refresh`users/${username}`, {
           headers: { "Content-Type": "application/json" },
           timeout: 10000,
         })

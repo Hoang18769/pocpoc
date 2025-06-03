@@ -116,7 +116,7 @@ export default function AuthPage() {
 
       setLoading(true)
       try {
-        const res = await api.post(`/v1/auth/login`, { email, password })
+        const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/v1/auth/login`, { email, password })
         if (res.data.code === 200) {
           if (res.data.body.token) {           
             const token = res.data.body.token;

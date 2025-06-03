@@ -29,6 +29,7 @@ export default function ProfileHeader({ profileData, isOwnProfile = true }) {
       <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6 p-4 sm:p-6">
         <Avatar
           alt="Avatar"
+          src={ProfileData?.profilePictureUrl || "/avatar-placeholder.png"}
           className="rounded-full object-cover md:w-28 md:h-28 sm:w-32 sm:h-32"
         />
 
@@ -94,7 +95,7 @@ export default function ProfileHeader({ profileData, isOwnProfile = true }) {
       </div>
 
       {/* Edit Profile Modal */}
-      <Modal
+      {/* <Modal
         isOpen={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}
       >
@@ -102,7 +103,7 @@ export default function ProfileHeader({ profileData, isOwnProfile = true }) {
           profileData={ProfileData}
           onSave={handleSaveProfile}
         />
-      </Modal>
+      </Modal> */}
     </div>
   )
 }
