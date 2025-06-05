@@ -34,7 +34,8 @@ export default function ProfilePage() {
     <main className="max-w-4xl mx-auto mt-4">
       {profileData ? (
         <>
-          <ProfileHeader profileData={profileData} />
+          <ProfileHeader
+           profileData={profileData} />
           {/* Ví dụ hiển thị bài viết người dùng */}
           {/* {profileData.posts.map(post => (
             <PostCard key={post.id} post={post} />
