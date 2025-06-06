@@ -1,0 +1,49 @@
+import { useEffect, useState } from "react"
+import api from "@/utils/axios"
+
+export default function useFriendRequestStatus(username, options = {}) {
+  const [status, setStatus] = useState("idle") // 'sent' | 'received' | 'none'
+  const { onReceivedRequestId, disabled = false } = options
+
+  useEffect(() => {
+    if (!username || disabled) return
+
+    const fetchStatus = async () => {
+      console.log("📡 Đang fetch trạng thái kết bạn với:", username)
+      try {
+        const [sentRes, receivedRes] = await Promise.all([
+          api.get("/v1/friend-request/sent-requests"),
+          api.get("/v1/friend-request/received-requests"),
+        ])
+
+        const sent = sentRes.data.body
+        const received = receivedRes.data.data.content
+
+        console.log("📤 Sent requests:", sent)
+        console.log("📥 Received requests:", received)
+
+        const sentReq = sent.find((r) => r.receiver.username === username)
+        if (sentReq) {
+          setStatus("sent")
+          return
+        }
+
+        const receivedReq = received.find((r) => r.sender.username === username)
+        if (receivedReq) {
+          setStatus("received")
+          onReceivedRequestId?.(receivedReq.id)
+          return
+        }
+
+        setStatus("none")
+      } catch (err) {
+        console.error("❌ Lỗi khi kiểm tra trạng thái kết bạn:", err)
+        setStatus("none")
+      }
+    }
+
+    fetchStatus()
+  }, [username, disabled, onReceivedRequestId])
+
+  return status
+}
