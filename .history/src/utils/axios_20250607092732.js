@@ -96,7 +96,7 @@ async function handleTokenRefresh(originalRequest) {
     // Nếu refresh thất bại: xóa token và notify
     localStorage.removeItem("accessToken");
         localStorage.removeItem("userName");
-            localStorage.removeItem("userId");
+            localStorage.removeItem("accessToken");
 
 
     delete api.defaults.headers.common.Authorization;

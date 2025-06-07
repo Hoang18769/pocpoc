@@ -3,44 +3,39 @@
 import { useEffect, useRef } from "react";
 import { createStompClient } from "@/utils/socket";
 import toast from "react-hot-toast";
-import { useNotifications } from "@/context/NotificationContext";
 
-export default function useNotificationSocket(userId, token) {
+export default function useNotificationSocket(userId) {
   const clientRef = useRef(null);
-  const { addNotification } = useNotifications();
-  useEffect(() => {
-    if (!userId || !token) return;
 
-    const client = createStompClient(token);
+  useEffect(() => {
+    if (!userId) return;
+
+    const token = localStorage.getItem("accessToken");
+    const client = createStompClient(token); // lấy token mới nhất từ localStorage
+
     clientRef.current = client;
 
-    client.onConnect = () => {
+   setTimeout( client.onConnect = () => {
       console.log("🔌 Connected to WebSocket");
 
       client.subscribe(`/notifications/${userId}`, (message) => {
         try {
           const data = JSON.parse(message.body);
           console.log("🔔 Notification received:", data);
-          addNotification(data);
 
-          // ✅ Xử lý và hiển thị toast tùy theo action
           switch (data.action) {
             case "SENT_ADD_FRIEND_REQUEST":
               toast(`${data.creator.givenName} đã gửi lời mời kết bạn 💌`);
               break;
-
             case "ACCEPTED_FRIEND_REQUEST":
               toast(`${data.creator.givenName} đã chấp nhận lời mời kết bạn 🤝`);
               break;
-
             case "POST_LIKED":
               toast(`${data.creator.givenName} đã thích bài viết của bạn ❤️`);
               break;
-
             case "NEW_MESSAGE":
               toast(`${data.creator.givenName} đã nhắn tin cho bạn 💬`);
               break;
-
             default:
               toast(`🔔 Có thông báo mới từ ${data.creator?.givenName || "ai đó"}`);
               break;
@@ -49,17 +44,17 @@ export default function useNotificationSocket(userId, token) {
           console.error("❌ Failed to parse WebSocket message:", err);
         }
       });
-    };
+    }, 5000)
 
     client.onStompError = (frame) => {
-      console.error("❌ STOMP error", frame);
+      console.error(" STOMP error", frame);
     };
 
     client.activate();
 
     return () => {
       client.deactivate();
-      console.log("❌ Disconnected from WebSocket");
+      console.log("Disconnected from WebSocket");
     };
-  }, [userId, token,addNotification]);
+  }, [userId]);
 }

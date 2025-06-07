@@ -62,13 +62,8 @@ export default function NewPostModal({ isOpen, onClose }) {
           "Content-Type": "multipart/form-data",
         },
       });
-      if(res.data.code===200){
-        toast(`Đăng bài thành công`);
-      }
-      else{
-        toast(`Có lỗi xảy ra, vui lòng thử lại`);
+                    toast(`${data.creator.givenName} đã chấp nhận lời mời kết bạn 🤝`);
 
-      }
       console.log("✅ Post success:", res.data);
       onClose();
 

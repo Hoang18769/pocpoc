@@ -36,9 +36,9 @@ export default function PostCard({ post, token, liked, onLikeToggle, size = "def
     <Card className={`bg-[var(--card)] text-[var(--card-foreground)] rounded-xl shadow-sm ${padding} w-full ${className}`}>
       <div className={`flex items-center justify-between ${spacing}`}>
         <div className="flex items-center gap-2">
-          <Avatar src={post.author?.profilePictureUrl} alt={post.author?.username || ""} size={avatarSize} />
+          <Avatar src={post.author?.avatar} alt={post.author?.username || ""} size={avatarSize} />
           <div>
-            <p className={`font-semibold ${textSizes.username}`}>{post.author?.familyName +" "+ post.author?.givenName}</p>
+            <p className={`font-semibold ${textSizes.username}`}>{post.author?.familyName +" "+ post.author?.familyName}</p>
             <p className={textSizes.time}>{new Date(post.createdAt).toLocaleString()}</p>
           </div>
         </div>

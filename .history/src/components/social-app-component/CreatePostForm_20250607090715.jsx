@@ -6,8 +6,6 @@ import Image from "next/image";
 import { Trash2 } from "lucide-react";
 import ImageView from "../ui-components/ImageView";
 import api from "@/utils/axios";
-import ImagePreview from "../ui-components/imagePreview";
-import toast from "react-hot-toast";
 
 export default function NewPostModal({ isOpen, onClose }) {
   const fileInputRef = useRef(null);
@@ -62,13 +60,7 @@ export default function NewPostModal({ isOpen, onClose }) {
           "Content-Type": "multipart/form-data",
         },
       });
-      if(res.data.code===200){
-        toast(`Đăng bài thành công`);
-      }
-      else{
-        toast(`Có lỗi xảy ra, vui lòng thử lại`);
 
-      }
       console.log("✅ Post success:", res.data);
       onClose();
 
@@ -121,7 +113,7 @@ export default function NewPostModal({ isOpen, onClose }) {
           <div className="flex flex-col md:flex-row gap-6 p-4">
             {/* Image preview - Left (50%) */}
             <div className="md:w-1/2 w-full">
-              <ImagePreview
+              <Image
                 images={images.map((img) => img.preview)}
                 onImageClick={(index) => {
                   console.log("Clicked image at index", index);

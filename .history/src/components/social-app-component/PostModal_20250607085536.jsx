@@ -29,17 +29,6 @@ export default function PostModal({ post, activeIndex = 0, token, onClose, onLik
     setTouchStartX(null)
   }
 
-  const appendToken = (url) => {
-    try {
-      const imageUrl = new URL(url, typeof window !== "undefined" ? window.location.origin : "http://localhost")
-      imageUrl.searchParams.set("token", token)
-      return imageUrl.toString()
-    } catch (error) {
-      console.error("Invalid image URL:", url)
-      return url
-    }
-  }
-
   if (!Array.isArray(images) || !images[index]) return null
 
   return (
@@ -52,7 +41,7 @@ export default function PostModal({ post, activeIndex = 0, token, onClose, onLik
           onTouchEnd={handleTouchEnd}
         >
           <Image
-            src={appendToken(images[index])}
+            src={images[index]}
             alt={`Post image ${index + 1}`}
             fill
             unoptimized
@@ -82,10 +71,10 @@ export default function PostModal({ post, activeIndex = 0, token, onClose, onLik
         <div className="w-full md:w-2/5 p-4 flex flex-col justify-between overflow-y-auto">
           <div className="flex-1 overflow-y-auto mb-4">
             <div className="flex items-center gap-3 mb-4">
-              <Avatar src={post.author?.profilePictureUrl} alt={post.author?.userName} size={36} />
+              <Avatar src={post.user?.avatar} alt={post.user?.name} size={36} />
               <div>
-                <p className="font-semibold text-sm"> {post.author?.givenName || ""} {post.author?.familyName || ""}</p>
-                <p className="text-xs text-[var(--muted-foreground)]">{new Date(post.createdAt).toLocaleString()}</p>
+                <p className="font-semibold text-sm">{post.user?.name}</p>
+                <p className="text-xs text-[var(--muted-foreground)]">{post.time}</p>
               </div>
             </div>
 

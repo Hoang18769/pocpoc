@@ -82,10 +82,10 @@ export default function PostModal({ post, activeIndex = 0, token, onClose, onLik
         <div className="w-full md:w-2/5 p-4 flex flex-col justify-between overflow-y-auto">
           <div className="flex-1 overflow-y-auto mb-4">
             <div className="flex items-center gap-3 mb-4">
-              <Avatar src={post.author?.profilePictureUrl} alt={post.author?.userName} size={36} />
+              <Avatar src={post.user?.profilePictureUrl} alt={post.user?.name} size={36} />
               <div>
-                <p className="font-semibold text-sm"> {post.author?.givenName || ""} {post.author?.familyName || ""}</p>
-                <p className="text-xs text-[var(--muted-foreground)]">{new Date(post.createdAt).toLocaleString()}</p>
+                <p className="font-semibold text-sm">{post.user?.name}</p>
+                <p className="text-xs text-[var(--muted-foreground)]">{post.time}</p>
               </div>
             </div>
 

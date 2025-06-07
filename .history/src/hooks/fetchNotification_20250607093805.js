@@ -4,9 +4,9 @@ export async function fetchNotifications(token, page = 0, size = 10) {
   try {
     const res = await api.get(`/v1/notifications`, {
       params: { page, size },
-      // headers: {
-      //   Authorization: `Bearer ${token}`,
-      // },
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
     });
 
     return res.data; // dữ liệu từ backend, thường là { content: [...], ... }

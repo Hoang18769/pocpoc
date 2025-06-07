@@ -85,7 +85,7 @@ export default function PostModal({ post, activeIndex = 0, token, onClose, onLik
               <Avatar src={post.author?.profilePictureUrl} alt={post.author?.userName} size={36} />
               <div>
                 <p className="font-semibold text-sm"> {post.author?.givenName || ""} {post.author?.familyName || ""}</p>
-                <p className="text-xs text-[var(--muted-foreground)]">{new Date(post.createdAt).toLocaleString()}</p>
+            <p className>{new Date(post.createdAt).toLocaleString()}</p>
               </div>
             </div>
 
