@@ -1,28 +1,16 @@
 "use client"
 import Image from "next/image"
 
-export default function ImageView({ images = [], token, onImageClick }) {
+export default function ImageView({ images = [], token,  onImageClick }) {
   if (!Array.isArray(images) || images.length === 0) return null
 
   const imageWrapperClass = "relative aspect-square rounded-lg overflow-hidden cursor-pointer"
-
-  // Hàm tiện ích để thêm token vào URL
-  const appendToken = (url) => {
-    try {
-      const imageUrl = new URL(url, typeof window !== "undefined" ? window.location.origin : "http://localhost")
-      imageUrl.searchParams.set("token", token)
-      return imageUrl.toString()
-    } catch (error) {
-      console.error("Invalid image URL:", url)
-      return url
-    }
-  }
 
   if (images.length === 1) {
     return (
       <div className={`${imageWrapperClass} mt-2`}>
         <Image
-          src={appendToken(images[0])}
+          src={images[0]}
           alt="Post image"
           fill
           unoptimized
@@ -39,7 +27,7 @@ export default function ImageView({ images = [], token, onImageClick }) {
         {images.map((img, index) => (
           <div key={index} className={imageWrapperClass}>
             <Image
-              src={appendToken(img)}
+              src={img}
               alt={`Post image ${index + 1}`}
               fill
               unoptimized
@@ -58,7 +46,7 @@ export default function ImageView({ images = [], token, onImageClick }) {
         {images.map((img, index) => (
           <div key={index} className={imageWrapperClass}>
             <Image
-              src={appendToken(img)}
+              src={img}
               alt={`Post image ${index + 1}`}
               fill
               unoptimized
@@ -77,7 +65,7 @@ export default function ImageView({ images = [], token, onImageClick }) {
         {images.slice(0, 3).map((img, index) => (
           <div key={index} className={imageWrapperClass}>
             <Image
-              src={appendToken(img)}
+              src={img}
               alt={`Post image ${index + 1}`}
               fill
               unoptimized
@@ -88,7 +76,7 @@ export default function ImageView({ images = [], token, onImageClick }) {
         ))}
         <div className={`${imageWrapperClass} brightness-50`}>
           <Image
-            src={appendToken(images[3])}
+            src={images[3]}
             alt="Post image 4"
             fill
             unoptimized
