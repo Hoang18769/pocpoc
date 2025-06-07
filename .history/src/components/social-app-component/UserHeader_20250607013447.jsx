@@ -4,33 +4,39 @@ import { useState, useEffect } from "react"
 import Avatar from "../ui-components/Avatar"
 export default function UserHeader({
   user,
-  variant = "post", 
+  variant = "post", // "post" hoặc "chat"
   lastonline = true,
   isme = false,
-  size = "Large",
+  size = "Large", // "compact", "default", "large"
   className = "",
 }) {
   const [isMobile, setIsMobile] = useState(false)
 
   useEffect(() => {
     const checkIfMobile = () => {
-      setIsMobile(window.innerWidth < 640)
+      setIsMobile(window.innerWidth < 640) // 640px là breakpoint sm của Tailwind
     }
+
+    // Kiểm tra ban đầu
     checkIfMobile()
 
+    // Thêm event listener để kiểm tra khi resize
     window.addEventListener("resize", checkIfMobile)
 
     return () => window.removeEventListener("resize", checkIfMobile)
   }, [])
 
+  // Mặc định user object
   const defaultUser = {
     name: "Name",
     avatar: "/placeholder.svg?height=100&width=100",
     lastOnline: "59 minutes ago",
   }
 
+  // Merge với default nếu một số thuộc tính bị thiếu
   const userData = { ...defaultUser, ...user }
 
+  // Xác định kích thước avatar dựa trên prop size và responsive
   const getAvatarSize = () => {
     if (isMobile) {
       return size === "compact" ? 28 : size === "large" ? 40 : 32

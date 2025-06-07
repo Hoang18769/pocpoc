@@ -18,19 +18,23 @@ export default function UserHeader({
     }
     checkIfMobile()
 
+    // Thêm event listener để kiểm tra khi resize
     window.addEventListener("resize", checkIfMobile)
 
     return () => window.removeEventListener("resize", checkIfMobile)
   }, [])
 
+  // Mặc định user object
   const defaultUser = {
     name: "Name",
     avatar: "/placeholder.svg?height=100&width=100",
     lastOnline: "59 minutes ago",
   }
 
+  // Merge với default nếu một số thuộc tính bị thiếu
   const userData = { ...defaultUser, ...user }
 
+  // Xác định kích thước avatar dựa trên prop size và responsive
   const getAvatarSize = () => {
     if (isMobile) {
       return size === "compact" ? 28 : size === "large" ? 40 : 32

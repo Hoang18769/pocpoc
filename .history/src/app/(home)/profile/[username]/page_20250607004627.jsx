@@ -53,6 +53,7 @@ const { toggleLike } = usePostActions({ posts, setPosts })
         const res = await api.get(`/v1/posts/of-user/${routeUsername}`)
         if (res.data.code === 200) {
           setPosts(res.data.body || [])
+          console.log(res.data.bod)
         }
       } catch (error) {
         console.error("Lỗi khi tải bài viết:", error)

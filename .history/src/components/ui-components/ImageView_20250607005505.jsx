@@ -1,7 +1,7 @@
 "use client"
 import Image from "next/image"
 
-export default function ImageView({ images = [], token,  onImageClick }) {
+export default function ImageView({ images = [], token, onImageClick }) {
   if (!Array.isArray(images) || images.length === 0) return null
 
   const imageWrapperClass = "relative aspect-square rounded-lg overflow-hidden cursor-pointer"

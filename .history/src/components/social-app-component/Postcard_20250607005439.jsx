@@ -50,7 +50,7 @@ export default function PostCard({ post, token, liked, onLikeToggle, size = "def
       </p>
 
       {Array.isArray(post.files) && post.files.length > 0 && (
-        <ImageView images={post.files} token={token} onImageClick={(i) => setActiveImageIndex(i)} />
+        <ImageView images={post.files} onImageClick={(i) => setActiveImageIndex(i)} />
       )}
 
       <div className="flex mt-3 gap-4 text-[var(--muted-foreground)]">

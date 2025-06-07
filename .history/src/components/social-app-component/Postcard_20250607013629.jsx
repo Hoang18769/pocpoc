@@ -17,7 +17,6 @@ export default function PostCard({ post, token, liked, onLikeToggle, size = "def
     return () => window.removeEventListener("resize", checkScreenSize)
   }, [])
 
-  if (isMobile === undefined) return null
 
   const avatarSize = size === "compact" ? (isMobile ? 28 : 32) : size === "large" ? (isMobile ? 36 : 48) : (isMobile ? 32 : 40)
   const padding = size === "compact" ? "p-2 sm:p-3" : size === "large" ? "p-5" : "p-4"

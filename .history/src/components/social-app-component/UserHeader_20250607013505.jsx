@@ -29,8 +29,10 @@ export default function UserHeader({
     lastOnline: "59 minutes ago",
   }
 
+  // Merge với default nếu một số thuộc tính bị thiếu
   const userData = { ...defaultUser, ...user }
 
+  // Xác định kích thước avatar dựa trên prop size và responsive
   const getAvatarSize = () => {
     if (isMobile) {
       return size === "compact" ? 28 : size === "large" ? 40 : 32

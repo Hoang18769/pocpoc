@@ -30,7 +30,7 @@ export default function ProfileHeader({ profileData, isOwnProfile = true, onProf
     try {
       const res = await api.post(`/v1/friend-request/${profileData.username}`);
       if (res.data.code === 200) {
-        console.log(" Gửi lời mời thành công");
+        console.log("✅ Gửi lời mời thành công");
         setFriendRequestStatus("sent");
       }
     } catch (error) {
@@ -43,7 +43,7 @@ export default function ProfileHeader({ profileData, isOwnProfile = true, onProf
     try {
       const res = await api.post(`/v1/friend-request/accept/${requestId}`);
       if (res.data.code === 200) {
-        console.log(" Chấp nhận kết bạn thành công");
+        console.log("✅ Chấp nhận kết bạn thành công");
         setFriendRequestStatus("friend");
       }
     } catch (error) {
@@ -55,7 +55,7 @@ export default function ProfileHeader({ profileData, isOwnProfile = true, onProf
     if (!friendId) return;
     try {
       await api.delete(`/v1/friends/${friendId}`);
-      console.log(" Hủy kết bạn thành công");
+      console.log("✅ Hủy kết bạn thành công");
       setFriendRequestStatus("none");
     } catch (error) {
       console.error(" Lỗi khi hủy kết bạn:", error);

@@ -7,9 +7,10 @@ import { Heart, MessageCircle, SendHorizonal } from "lucide-react"
 import ImageView from "../ui-components/ImageView"
 import PostModal from "../social-app-component/PostModal"
 
-export default function PostCard({ post, token, liked, onLikeToggle, size = "default", className = "" }) {
+export default function PostCard({ post, liked, onLikeToggle, size = "default", className = "" }) {
   const [isMobile, setIsMobile] = useState(undefined)
   const [activeImageIndex, setActiveImageIndex] = useState(null)
+  console.log(post)
   useEffect(() => {
     const checkScreenSize = () => setIsMobile(window.innerWidth < 640)
     checkScreenSize()
@@ -50,7 +51,7 @@ export default function PostCard({ post, token, liked, onLikeToggle, size = "def
       </p>
 
       {Array.isArray(post.files) && post.files.length > 0 && (
-        <ImageView images={post.files} token={token} onImageClick={(i) => setActiveImageIndex(i)} />
+        <ImageView images={post.files} onImageClick={(i) => setActiveImageIndex(i)} />
       )}
 
       <div className="flex mt-3 gap-4 text-[var(--muted-foreground)]">
