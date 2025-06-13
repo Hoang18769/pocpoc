@@ -40,10 +40,7 @@ export default function HomePage() {
   return (
     <main className="p-6 space-y-6 flex flex-col items-center">
       {posts.length > 0 ? (
-        posts
-          .slice()
-          .reverse()
-          .map((post) => (
+        posts.map((post) => (
             <PostCard
               key={post.id}
               post={post}

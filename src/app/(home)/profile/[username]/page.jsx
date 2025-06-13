@@ -4,7 +4,6 @@ import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
 import ProfileHeader from "@/components/social-app-component/ProfileHeader"
 import api from "@/utils/axios"
-import Connectimg from "@/assests/photo/Connect.jpg"
 import PostCard from "@/components/social-app-component/PostCard"
 import usePostActions from "@/hooks/usePostAction"
 
@@ -32,6 +31,7 @@ const { toggleLike } = usePostActions({ posts, setPosts })
         if (res.data.code === 200) {
           setProfileData(res.data.body)
         }
+        console.log(res.data.body)
       } catch (error) {
         console.error("Failed to fetch profile:", error)
       }
@@ -104,6 +104,7 @@ const handleToggleLike = async (postId) => {
               setProfileData((prev) => ({ ...prev, ...updatedData }))
             }
           />
+          
 
           <section className="mt-6 space-y-4">
   {posts.length > 0 ? (

@@ -1,43 +1,99 @@
-"use client"
-import Image from "next/image"
-import { useState, useRef } from "react"
-import { Volume2, VolumeX } from "lucide-react" // 👈 Import icon
+"use client";
+import Image from "next/image";
+import { useState, useRef, useEffect } from "react";
+import { Volume2, VolumeX } from "lucide-react";
 
-const isVideo = (url) => typeof url === "string" && url.match(/\.(mp4|webm|ogg)$/i)
+const isVideo = (url) =>
+  typeof url === "string" && url.match(/\.(mp4|webm|ogg)$/i);
 
-export default function ImageView({ images = [], onImageClick }) {
-  const [mutedVideos, setMutedVideos] = useState({})
-  const videoRefs = useRef({})
+export default function ImageView({
+  images = [],
+  onImageClick,
+  isActive = true,
+}) {
+  const [mutedVideos, setMutedVideos] = useState({});
+  const videoRefs = useRef({});
 
   const toggleMute = (index) => {
-    const video = videoRefs.current[index]
+    const video = videoRefs.current[index];
     if (video) {
-      const newMuted = !video.muted
-      video.muted = newMuted
-      setMutedVideos((prev) => ({ ...prev, [index]: newMuted }))
+      const newMuted = !video.muted;
+      video.muted = newMuted;
+      setMutedVideos((prev) => ({ ...prev, [index]: newMuted }));
     }
-  }
+  };
+
+  useEffect(() => {
+    Object.values(videoRefs.current).forEach((video) => {
+      if (!video) return;
+      if (isActive) {
+        video.play().catch(() => {});
+      } else {
+        video.pause();
+      }
+    });
+  }, [isActive]);
+
+  // Setup IntersectionObserver for videos
+  useEffect(() => {
+    const observers = [];
+
+    Object.entries(videoRefs.current).forEach(([index, video]) => {
+      if (!video) return;
+
+      const observer = new IntersectionObserver(
+        ([entry]) => {
+          if (isActive) {
+            if (entry.isIntersecting) {
+              video.play().catch(() => {});
+            } else {
+              video.pause();
+            }
+          }
+        },
+        { threshold: 0.5 }
+      );
+
+      observer.observe(video);
+      observers.push({ video, observer });
+    });
+
+    return () => {
+      observers.forEach(({ video, observer }) => {
+        if (observer && video) observer.unobserve(video);
+      });
+    };
+  }, [images, isActive]);
 
   const imageWrapperClass =
-    "relative aspect-square rounded-lg overflow-hidden cursor-pointer"
+    "relative aspect-square rounded-lg overflow-hidden cursor-pointer";
 
   const renderMedia = (src, index) => {
-    const isVid = isVideo(src)
+    const isVid = isVideo(src);
 
     return (
       <div key={index} className={imageWrapperClass}>
         {isVid ? (
           <div className="relative w-full h-full">
             <video
-  ref={(el) => (videoRefs.current[index] = el)}
-  src={src}
-  className="object-cover w-full h-full rounded-lg cursor-pointer"
-  loop
-  muted={mutedVideos[index] ?? true}
-  playsInline
-  autoPlay
-  onClick={() => onImageClick(index)} // 👈 thêm dòng này
-/>
+              ref={(el) => {
+                if (el) videoRefs.current[index] = el;
+              }}
+              src={src}
+              className="object-cover w-full h-full rounded-lg cursor-pointer"
+              loop
+              muted
+              playsInline
+              autoPlay
+              onClick={() => onImageClick(index)}
+              onLoadedMetadata={(e) => {
+                const video = e.currentTarget;
+                setMutedVideos((prev) => ({
+                  ...prev,
+                  [index]: video.muted,
+                }));
+              }}
+            />
 
             <button
               onClick={() => toggleMute(index)}
@@ -61,23 +117,25 @@ export default function ImageView({ images = [], onImageClick }) {
           />
         )}
       </div>
-    )
-  }
+    );
+  };
 
-  if (!Array.isArray(images) || images.length === 0) return null
-  if (images.length === 1) return <div className="mt-2">{renderMedia(images[0], 0)}</div>
+  // Layout logic
+  if (!Array.isArray(images) || images.length === 0) return null;
+  if (images.length === 1)
+    return <div className="mt-2">{renderMedia(images[0], 0)}</div>;
   if (images.length <= 3)
     return (
       <div className={`grid grid-cols-${images.length} gap-2 mt-2`}>
         {images.map((src, index) => renderMedia(src, index))}
       </div>
-    )
+    );
   if (images.length === 4)
     return (
       <div className="grid grid-cols-2 gap-2 mt-2">
         {images.map((src, index) => renderMedia(src, index))}
       </div>
-    )
+    );
   if (images.length >= 5)
     return (
       <div className="grid grid-cols-2 gap-2 mt-2">
@@ -89,7 +147,7 @@ export default function ImageView({ images = [], onImageClick }) {
           </span>
         </div>
       </div>
-    )
+    );
 
-  return null
+  return null;
 }

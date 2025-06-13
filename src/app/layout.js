@@ -2,7 +2,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import ThemeProvider from "@/providers/ThemeProvider";
 import Script from "next/script";
-import { NotificationProvider } from "@/context/NotificationContext";
+import { NotificationProvider } from "@/store/NotificationContext";
 
 export default function RootLayout({ children }) {
   return (

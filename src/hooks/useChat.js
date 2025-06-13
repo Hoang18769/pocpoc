@@ -8,10 +8,19 @@ import { toast } from "react-hot-toast";
 export default function useChat(chatId) {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState(null);
 
   const clientRef = useRef(null);
   const subscribedChatIdRef = useRef(null);
   const intervalRef = useRef(null);
+
+  // Lấy userId từ localStorage khi hook được khởi tạo
+  useEffect(() => {
+    const storedUserId = localStorage.getItem("userId");
+    if (storedUserId) {
+      setCurrentUserId(storedUserId);
+    }
+  }, []);
 
   // Fetch tin nhắn cũ
   useEffect(() => {
@@ -21,7 +30,9 @@ export default function useChat(chatId) {
       try {
         setLoading(true);
         const res = await api.get(`/v1/chat/messages/${chatId}?page=0&size=100`);
-        setMessages(res.data.body || []);
+        console.log(res);
+
+        setMessages(res.data.body);
       } catch (err) {
         console.error("❌ Lỗi khi tải tin nhắn", err);
         setMessages([]);
@@ -31,14 +42,14 @@ export default function useChat(chatId) {
     };
 
     fetchMessages();
-  }, [chatId]);
+  }, [chatId, currentUserId]);
 
   // Socket - lắng nghe tin nhắn mới
   useEffect(() => {
-    if (!chatId) return;
+    if (!chatId || !currentUserId) return;
 
     if (clientRef.current && clientRef.current.connected && subscribedChatIdRef.current === chatId) {
-      return; // Đã kết nối và subscribe rồi
+      return;
     }
 
     const client = createStompClient();
@@ -52,9 +63,50 @@ export default function useChat(chatId) {
           const data = JSON.parse(message.body);
           console.log("📩 New message received:", data);
 
-          setMessages((prev) => [...prev, data]);
+          // Xử lý lệnh DELETE
+          if (data.command === "DELETE") {
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === data.id ? { ...msg, content: "[Tin nhắn đã bị xóa]", deleted: true } : msg
+              )
+            );
+            return;
+          }
+          
+          // Xử lý lệnh EDIT
+          if (data.command === "EDIT") {
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === data.id
+                  ? { 
+                      ...msg, 
+                      content: data.message,
+                      edited: true,
+                      editedAt: data.editedAt || new Date().toISOString()
+                    }
+                  : msg
+              )
+            );
+            
+            const isOwnEdit = data.sender?.id === currentUserId;
+            if (!isOwnEdit && data.sender?.username) {
+              toast(`✏️ ${data.sender.username} đã chỉnh sửa tin nhắn`, {
+                duration: 3000,
+                position: "top-right",
+              });
+            }
+            return;
+          }
 
-          if (data?.sender && data?.content) {
+          // Thêm tin nhắn mới vào ĐẦU mảng
+          const newMessage = {
+            ...data,
+            isOwnMessage: data.sender?.id === currentUserId
+          };
+
+          setMessages((prev) => [newMessage, ...prev]);
+
+          if (data?.sender && data?.content && !newMessage.isOwnMessage) {
             toast(`💬 ${data.sender.username}: ${data.content}`, {
               duration: 4000,
               position: "top-right",
@@ -106,7 +158,11 @@ export default function useChat(chatId) {
       subscribedChatIdRef.current = null;
       console.log(`❌ Cleaned up WebSocket [chat:${chatId}]`);
     };
-  }, [chatId]);
+  }, [chatId, currentUserId]);
 
-  return { messages, loading };
+  return { 
+    messages, 
+    loading,
+    currentUserId
+  };
 }

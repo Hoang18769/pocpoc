@@ -6,98 +6,149 @@ import ChatItem from "./ChatItem";
 import Input from "../ui-components/Input";
 import Avatar from "../ui-components/Avatar";
 import { useEffect, useRef, useState } from "react";
+import api from "@/utils/axios";
 
 export default function ChatList({ onSelectChat, selectedChatId }) {
   const pathname = usePathname();
-  const { chats, loading, error } = useChatList();
+  const { chats, loading, error, markChatAsRead } = useChatList();
   const [expanded, setExpanded] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [searchResults, setSearchResults] = useState(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const [unreadCounts, setUnreadCounts] = useState({});
   const listRef = useRef(null);
 
   const isChatsPage = pathname === "/chats";
 
-  // Mở chế độ expanded nếu ở /chats
+  // Initialize unread counts
+  useEffect(() => {
+    const counts = {};
+    chats.forEach(chat => {
+      counts[chat.chatId] = chat.notReadMessageCount || 0;
+    });
+    setUnreadCounts(counts);
+  }, [chats]);
+
+  // Auto-expand on chats page
   useEffect(() => {
     if (isChatsPage) setExpanded(true);
   }, [isChatsPage]);
 
+  // Scroll to bottom on new messages
   useEffect(() => {
     if (listRef.current) {
       listRef.current.scrollTop = listRef.current.scrollHeight;
     }
   }, [chats]);
 
-  // Lọc theo từ khóa tìm kiếm
-  const filteredChats = chats.filter((chat) =>
-    `${chat.target.givenName} ${chat.target.familyName}`
-      .toLowerCase()
-      .includes(searchTerm.toLowerCase())
-  );
+  const handleChatSelect = async (chat) => {
+    // Immediate UI update
+    setUnreadCounts(prev => ({
+      ...prev,
+      [chat.chatId]: 0
+    }));
 
-  // Sắp xếp avatar không trùng trong mini mode
+    // Mark as read in backend
+    try {
+      if (markChatAsRead) {
+        await markChatAsRead(chat.chatId);
+      }
+    } catch (err) {
+      console.error("Failed to mark chat as read:", err);
+      // Rollback UI if API fails
+      setUnreadCounts(prev => ({
+        ...prev,
+        [chat.chatId]: chat.notReadMessageCount || 0
+      }));
+      return;
+    }
+
+    // Notify parent component
+    onSelectChat(chat.chatId, chat.target);
+  };
+
+  // Debounced search API call
+  useEffect(() => {
+    if (!searchTerm) {
+      setSearchResults(null);
+      return;
+    }
+
+    const timeout = setTimeout(async () => {
+      try {
+        setIsSearching(true);
+        const res = await api.get(`/v1/chat/search`, {
+          params: { query: searchTerm },
+        });
+        setSearchResults(res.data.body);
+      } catch (err) {
+        console.error("Search failed:", err);
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 3000);
+
+    return () => clearTimeout(timeout);
+  }, [searchTerm]);
+
+  const filteredChats = searchResults ?? chats;
+
   const uniqueChats = [
-    ...new Map(chats.map((chat) => [chat.target.userId, chat])).values(),
+    ...new Map(chats.map(chat => [chat.target.userId, chat])).values(),
   ];
 
-  // === Loading State ===
   if (loading) {
     return (
       <div className="space-y-3 p-4 animate-pulse">
-        {[...Array(3)].map((_, idx) => (
-          <div key={idx} className="h-10 bg-muted rounded-lg" />
+        {[...Array(5)].map((_, i) => (
+          <div key={i} className="h-14 bg-muted rounded-lg" />
         ))}
       </div>
     );
   }
 
-  // === Error State ===
   if (error) {
     return (
       <div className="p-4 text-center text-sm text-destructive">
-        Đã xảy ra lỗi khi tải tin nhắn.
+        Failed to load chats. Please try again.
       </div>
     );
   }
 
-  // === Empty State ===
   if (chats.length === 0) {
     return (
       <div className="p-4 text-center text-muted-foreground">
-        Không có đoạn chat nào.
+        No conversations yet
       </div>
     );
   }
 
-  // === Mini Mode ===
   if (!expanded && !isChatsPage) {
     return (
       <div
         role="button"
-        tabIndex={0}
-        aria-expanded="false"
         onClick={() => setExpanded(true)}
-        onKeyDown={(e) => e.key === "Enter" && setExpanded(true)}
-        className="w-[300px] max-w-md mx-auto flex items-center justify-between p-3 bg-background border rounded-full cursor-pointer hover:bg-accent"
+        className="w-[300px] max-w-md mx-auto flex items-center justify-between p-3 bg-background border rounded-full cursor-pointer hover:bg-accent transition-colors"
       >
         <div className="flex -space-x-2">
-          {uniqueChats.slice(0, 3).map((chat, index) => (
-            <div key={index} className="relative">
+          {uniqueChats.slice(0, 3).map((chat, i) => (
+            <div key={i} className="relative">
               <Avatar
                 src={chat.target.profilePictureUrl}
                 alt={`${chat.target.givenName} ${chat.target.familyName}`}
                 size="sm"
+                className="border-2 border-background"
               />
               {chat.target.online && (
-                <span className="absolute bottom-0 right-0 w-2 h-2 bg-green-500 border border-background rounded-full" />
+                <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border border-background" />
               )}
             </div>
           ))}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 ml-2">
           <span className="text-sm text-muted-foreground">
-            {chats.length > 3
-              ? `+${chats.length - 3} tin nhắn`
-              : `${chats.length} tin nhắn`}
+            {chats.length > 3 ? `+${chats.length - 3} more` : `${chats.length} chats`}
           </span>
           <ChevronDown className="h-4 w-4 text-muted-foreground" />
         </div>
@@ -105,37 +156,36 @@ export default function ChatList({ onSelectChat, selectedChatId }) {
     );
   }
 
-  // === Expanded Mode ===
   return (
-    <div className="w-full max-w-md mx-auto flex flex-col border rounded-lg overflow-hidden h-full">
-      {/* Header với nút thu gọn (ẩn khi ở /chats) */}
+    <div className="w-full max-w-md mx-auto bg-background flex flex-col border rounded-lg overflow-hidden h-full shadow-sm">
       {!isChatsPage && (
-        <div className="flex items-center justify-between p-3 bg-background border-b">
-          <h3 className="font-medium">Tin nhắn</h3>
+        <div className="flex items-center justify-between p-3 border-b">
+          <h3 className="font-medium text-sm">Messages</h3>
           <button
             onClick={() => setExpanded(false)}
-            className="text-muted-foreground hover:text-foreground"
+            className="text-muted-foreground hover:text-foreground transition-colors"
+            aria-label="Collapse chat list"
           >
             <ChevronUp className="h-5 w-5" />
           </button>
         </div>
       )}
 
-      {/* Thanh tìm kiếm */}
-      <div className="flex items-center bg-background px-3 py-2 border-b">
-        <SearchIcon className="h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Tìm kiếm đoạn chat..."
-          className="w-full bg-transparent border-none focus-visible:ring-0 pl-2"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
+      <div className="px-3 py-2 border-b">
+        <div className="relative">
+          <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search conversations..."
+            className="w-full pl-9"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
       </div>
 
-      {/* Danh sách chat */}
       <div
         ref={listRef}
-        className="flex-1 overflow-y-auto flex flex-col"
+        className="flex-1 overflow-y-auto"
         style={{ maxHeight: isChatsPage ? "none" : "400px" }}
       >
         {filteredChats.length > 0 ? (
@@ -144,16 +194,17 @@ export default function ChatList({ onSelectChat, selectedChatId }) {
             .map((chat) => (
               <ChatItem
                 key={chat.chatId}
-                chat={chat}
-                selected={selectedChatId === chat.chatId}
-                onClick={() => {
-                  onSelectChat(chat.chatId, chat.target);
+                chat={{
+                  ...chat,
+                  notReadMessageCount: unreadCounts[chat.chatId] || 0
                 }}
+                selected={selectedChatId === chat.chatId}
+                onClick={() => handleChatSelect(chat)}
               />
             ))
         ) : (
-          <div className="p-4 text-center text-muted-foreground">
-            Không tìm thấy đoạn chat nào.
+          <div className="p-4 text-center text-muted-foreground text-sm">
+            {isSearching ? "Searching..." : "No matches found"}
           </div>
         )}
       </div>

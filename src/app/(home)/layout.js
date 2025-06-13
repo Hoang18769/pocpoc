@@ -9,10 +9,10 @@ import Chatbox from "@/components/social-app-component/ChatBox";
 import Header from "@/components/ui-components/Header";
 import Sidebar from "@/components/ui-components/Sidebar";
 import ProgressBar from "@/components/ui-components/ProgressBar";
-import useNotificationSocket from "@/hooks/useNotificationSocket";
 import { Toaster } from "react-hot-toast";
 import ChatList from "@/components/social-app-component/ChatList";
-import { StepBack } from "lucide-react";
+import { SocketProvider } from "@/context/socketContext";
+import useNotificationSocket from "@/hooks/useNotificationSocket";
 
 export default function MainLayout({ children }) {
   const { resolvedTheme } = useTheme();
@@ -22,21 +22,10 @@ export default function MainLayout({ children }) {
 
   const [userId, setUserId] = useState(null);
   const [token, setToken] = useState(null);
-
-  // ✅ Thêm state điều khiển chat
   const [activeChatId, setActiveChatId] = useState(null);
   const [activeTargetUser, setActiveTargetUser] = useState(null);
 
-  const handleSelectChat = (chatId, user) => {
-    setActiveChatId(chatId);
-    setActiveTargetUser(user);
-  };
-
-  const handleBackToList = () => {
-    setActiveChatId(null);
-    setActiveTargetUser(null);
-  };
-
+  // Khởi tạo user data từ localStorage
   useEffect(() => {
     const storedUserId = localStorage.getItem("userId");
     const storedToken = localStorage.getItem("accessToken");
@@ -47,8 +36,10 @@ export default function MainLayout({ children }) {
     }
   }, []);
 
+  // Sử dụng socket notification
   useNotificationSocket(userId, token);
 
+  // Xử lý animation theme change
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -62,10 +53,45 @@ export default function MainLayout({ children }) {
     }
   }, [resolvedTheme, mounted]);
 
+  // Xác định các route ẩn right sidebar
   const hideRightSidebar =
     pathname.startsWith("/settings") ||
     pathname.startsWith("/search") ||
     pathname.startsWith("/chats");
+
+  // Xử lý chat
+  const handleSelectChat = (chatId, user) => {
+    setActiveChatId(chatId);
+    setActiveTargetUser(user);
+  };
+
+  const handleBackToList = () => {
+    setActiveChatId(null);
+    setActiveTargetUser(null);
+  };
+
+  const renderRightSidebar = () => {
+    if (hideRightSidebar) return null;
+
+    return (
+      <aside className="hidden md:flex justify-center items-end w-[80px] lg:w-[400px] lg:max-w-[400px] h-[calc(100vh-64px)] p-4">
+        <div className="flex flex-col w-full h-full relative">
+          {activeChatId && activeTargetUser ? (
+            <Chatbox
+              chatId={activeChatId}
+              targetUser={activeTargetUser}
+              onBack={handleBackToList}
+            />
+          ) : (
+            <ChatList
+              onSelectChat={handleSelectChat}
+              selectedChatId={activeChatId}
+            />
+          )}
+        </div>
+      </aside>
+    );
+  };
 
   const layoutContent = (
     <>
@@ -78,7 +104,7 @@ export default function MainLayout({ children }) {
         </header>
 
         <div className="flex flex-1 pt-16 bg-[var(--background)] text-[var(--foreground)] transition-colors duration-500">
-          {/* Sidebar */}
+          {/* Left Sidebar */}
           <aside className="md:w-[80px] h-[calc(100vh-64px)] overflow-y-auto">
             <Sidebar />
           </aside>
@@ -94,30 +120,8 @@ export default function MainLayout({ children }) {
             </div>
           </main>
 
-          {/* Right Sidebar: ChatList ↔ ChatBox */}
-          {!hideRightSidebar && (
-            <aside className="hidden md:flex justify-center items-end w-[80px] lg:w-[400px] lg:max-w-[400px] h-[calc(100vh-64px)] p-4">
-              <div className="flex flex-col w-full h-full relative">
-                {activeChatId && activeTargetUser ? (
-                  <>
-                    {/* Nút quay lại */}
-                    
-                    <Chatbox
-  chatId={activeChatId}
-  targetUser={activeTargetUser}
-  onBack={handleBackToList} 
-/>
-
-                  </>
-                ) : (
-                  <ChatList
-                    onSelectChat={handleSelectChat}
-                    selectedChatId={activeChatId}
-                  />
-                )}
-              </div>
-            </aside>
-          )}
+          {/* Right Sidebar */}
+          {renderRightSidebar()}
         </div>
       </div>
     </>

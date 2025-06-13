@@ -10,7 +10,6 @@ import { useRouter } from "next/navigation"
 import toast from "react-hot-toast"
 import dayjs from "dayjs"
 import relativeTime from "dayjs/plugin/relativeTime"
-import axios from "@/utils/axios"
 import api from "@/utils/axios"
 
 dayjs.extend(relativeTime)
@@ -26,8 +25,9 @@ export default function PostCard({ post, liked, onLikeToggle, size = "default", 
   const [loading, setLoading] = useState(false)
   const router = useRouter()
 
+  const isModalOpen = activeImageIndex !== null || showModal
+
   useEffect(() => {
-    console.log(post.files)
     const checkScreenSize = () => setIsMobile(window.innerWidth < 640)
     checkScreenSize()
     window.addEventListener("resize", checkScreenSize)
@@ -55,23 +55,35 @@ export default function PostCard({ post, liked, onLikeToggle, size = "default", 
   }
 
   const handleSaveEdit = async () => {
-    setLoading(true)
-    try {
-      await Promise.all([
-        api.post(`/v1/posts/update-content`, { content: newContent }, { params: { id: post.id } }),
-        api.post(`/v1/posts/update-privacy`, { privacy: newPrivacy }, { params: { id: post.id } })
-      ])
-      toast.success("Cập nhật bài viết thành công!")
-      post.content = newContent
-      post.privacy = newPrivacy
-      setEditing(false)
-    } catch (err) {
-      toast.error("Lỗi khi cập nhật bài viết!")
-      console.error(err)
-    } finally {
-      setLoading(false)
+  setLoading(true)
+  try {
+    const requests = []
+    if (newContent !== post.content) {
+      requests.push(
+        api.patch(`/v1/posts/update-content/${post.id}`, null, {
+          params: { content: newContent }
+        })
+      )
     }
+    if (newPrivacy !== post.privacy) {
+      requests.push(
+        api.patch(`/v1/posts/update-privacy/${post.id}`, null, {
+          params: {privacy: newPrivacy }
+        })
+      )
+    }
+    await Promise.all(requests)
+    toast.success("Cập nhật bài viết thành công!")
+    post.content = newContent
+    post.privacy = newPrivacy
+    setEditing(false)
+  } catch (err) {
+    toast.error("Lỗi khi cập nhật bài viết!")
+    console.error(err)
+  } finally {
+    setLoading(false)
   }
+}
 
   const handleShare = () => {
     toast.success("Bài viết đã được chia sẻ (demo)!")
@@ -129,13 +141,14 @@ export default function PostCard({ post, liked, onLikeToggle, size = "default", 
       {editing ? (
         <div className="flex flex-col gap-3 mb-3">
           <textarea
-            className="w-full p-2 border rounded-md text-sm text-[var(--foreground)] bg-transparent resize-none"
-            rows={4}
+            className="w-full p-3 border rounded-md text-sm text-[var(--foreground)] bg-transparent resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            rows={6}
             value={newContent}
             onChange={(e) => setNewContent(e.target.value)}
+            placeholder="Nhập nội dung bài viết..."
           />
           <select
-            className="w-full p-2 border rounded-md text-sm bg-transparent text-[var(--foreground)]"
+            className="w-full p-3 border rounded-md text-sm bg-transparent text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             value={newPrivacy}
             onChange={(e) => setNewPrivacy(e.target.value)}
           >
@@ -147,16 +160,16 @@ export default function PostCard({ post, liked, onLikeToggle, size = "default", 
             <button
               onClick={handleSaveEdit}
               disabled={loading}
-              className="px-4 py-2 rounded-md bg-blue-500 text-white hover:bg-blue-600 text-sm"
+              className="px-4 py-2 rounded-md bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
             >
-              {loading ? "Đang lưu..." : "Lưu"}
+              {loading ? "Đang lưu..." : "💾 Lưu"}
             </button>
             <button
               onClick={() => setEditing(false)}
               disabled={loading}
-              className="px-4 py-2 rounded-md border text-sm"
+              className="px-4 py-2 rounded-md border border-gray-300 text-sm font-medium hover:bg-gray-100 dark:hover:bg-[var(--input)] disabled:opacity-50"
             >
-              Hủy
+              ❌ Hủy
             </button>
           </div>
         </div>
@@ -167,7 +180,11 @@ export default function PostCard({ post, liked, onLikeToggle, size = "default", 
       )}
 
       {Array.isArray(post.files) && post.files.length > 0 && (
-        <ImageView images={post.files} onImageClick={(i) => setActiveImageIndex(i)} />
+        <ImageView
+          images={post.files}
+          isActive={!isModalOpen}
+          onImageClick={(i) => setActiveImageIndex(i)}
+        />
       )}
 
       <div className="flex mt-3 gap-4 text-[var(--muted-foreground)]">
@@ -191,7 +208,7 @@ export default function PostCard({ post, liked, onLikeToggle, size = "default", 
         Xem tất cả {post.commentCount} bình luận
       </button>
 
-      {(activeImageIndex !== null || showModal) && (
+      {isModalOpen && (
         <PostModal
           post={post}
           liked={post.liked}

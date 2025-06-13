@@ -4,23 +4,32 @@ import { useState } from "react";
 import Avatar from "../ui-components/Avatar";
 import Modal from "../ui-components/Modal";
 import EditProfileModal from "./EditProfile";
-import useFriendRequestStatus from "@/hooks/useFriendRequest";
 import api from "@/utils/axios";
 import toast from "react-hot-toast";
+import { useParams } from "next/navigation";
 
 export default function ProfileHeader({ profileData, isOwnProfile = true, onProfileUpdate }) {
   const [activeTab, setActiveTab] = useState("posts");
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const avatar = profileData.profilePictureUrl;
+  const { username: routeUsername } = useParams();
+  const username=profileData.username;
+  const handleBlockUser = async () => {
+    const confirm = window.confirm(`Bạn có chắc muốn chặn ${routeUsername}?`);
+    if (!confirm) return;
 
- const [
-  friendRequestStatus,
-  setFriendRequestStatus,
-  requestId,
-  friendId,
-  fetchFriendStatus
-] = useFriendRequestStatus(profileData?.username, { disabled: isOwnProfile });
-
+    try { 
+      const res = await api.post(`/v1/blocks/${routeUsername}`);
+      if (res.data.code === 200) {
+        alert(`Đã chặn ${routeUsername}`);
+      } else {
+        console.warn("Chặn thất bại:", res.data.message);
+      }
+    } catch (error) {
+      console.error("Lỗi khi chặn người dùng:", error);
+      alert("Có lỗi xảy ra khi chặn người dùng.");
+    }
+  };
 
   const handleSaveProfile = (newData) => {
     if (onProfileUpdate) onProfileUpdate(newData);
@@ -28,75 +37,100 @@ export default function ProfileHeader({ profileData, isOwnProfile = true, onProf
   };
 
   const cancelFriendRequest = async () => {
-    const prevStatus = friendRequestStatus;
-    setFriendRequestStatus("none"); // optimistic
     try {
-      await api.delete(`/v1/friend-request/delete/${requestId}`);
+      const res = await api.delete(`/v1/friend-request/delete/${username}`);
+      console.log(res);
       toast.success("Đã hủy lời mời kết bạn");
+      // Cập nhật UI ngay lập tức
+      onProfileUpdate({
+        ...profileData,
+        request: null
+      });
     } catch (error) {
-      setFriendRequestStatus(prevStatus);
+      console.log(error)
       toast.error("Lỗi khi hủy lời mời");
     }
   };
 
   const declineFriendRequest = async () => {
-    const prevStatus = friendRequestStatus;
-    setFriendRequestStatus("none"); // optimistic
     try {
-      const res = await api.delete(`/v1/friend-request/delete/${requestId}`);
-            console.log(res)
-
+      const res = await api.delete(`/v1/friend-request/delete/${username}`);
+      console.log(res);
       toast.success("Đã từ chối lời mời");
+      // Cập nhật UI ngay lập tức
+      onProfileUpdate({
+        ...profileData,
+        request: null
+      });
     } catch (error) {
-      setFriendRequestStatus(prevStatus);
       toast.error("Lỗi khi từ chối lời mời");
     }
   };
 
   const sendFriendRequest = async () => {
-  try {
-    const res = await api.post(`/v1/friend-request/${profileData.username}`);
-    if (res.data.code === 200) {
-      setFriendRequestStatus("sent");
-      // 🔁 Lấy lại requestId ngay sau đó
-      await fetchFriendStatus();
-    }
-  } catch (error) {
-    console.error("Lỗi gửi lời mời:", error);
-  }
-};
+    try {
+      const res = await api.post(`/v1/friend-request/send/${username}`);
+      if (res.data.code === 200) {
+              toast.error("Gửi lời mời thành công");
 
-  
+        onProfileUpdate({
+          ...profileData,
+          request:  "OUT" 
+        });
+      }
+    } catch (error) {
+      console.error("Lỗi gửi lời mời:", error);
+    }
+  };
 
   const acceptFriendRequest = async () => {
-    const prevStatus = friendRequestStatus;
-    setFriendRequestStatus("friend"); // optimistic
     try {
-      const res = await api.post(`/v1/friend-request/accept/${requestId}`);
-      if (res.data.code !== 200) throw new Error();
-      toast.success("Đã chấp nhận kết bạn");
+      const res = await api.post(`/v1/friend-request/accept/${username}`);
+      if (res.data.code === 200) {
+        toast.success("Đã chấp nhận kết bạn");
+        // Cập nhật UI ngay lập tức
+        onProfileUpdate({
+          ...profileData,
+          friend: true,
+          request: null,
+          friendCount: profileData.friendCount + 1
+        });
+      }
     } catch (error) {
-      setFriendRequestStatus(prevStatus);
       toast.error("Lỗi khi chấp nhận kết bạn");
     }
   };
 
   const unfriend = async () => {
-    const prevStatus = friendRequestStatus;
-    setFriendRequestStatus("none"); // optimistic
     try {
-      const res = await api.delete(`/v1/friends/${friendId}`);
-      console.log(res)
+      const res = await api.delete(`/v1/friends/${username}`);
+      console.log(res);
       toast.success("Đã hủy kết bạn");
+      // Cập nhật UI ngay lập tức
+      onProfileUpdate({
+        ...profileData,
+        isFriend: false,
+        friendCount: profileData.friendCount - 1
+      });
     } catch (error) {
-      setFriendRequestStatus(prevStatus);
       toast.error("Lỗi khi hủy kết bạn");
     }
   };
 
   const renderFriendButton = () => {
-    switch (friendRequestStatus) {
-      case "sent":
+    if (profileData.isFriend) {
+      return (
+        <button
+          onClick={unfriend}
+          className="px-4 py-1 bg-red-500 hover:bg-red-600 text-white rounded text-sm"
+        >
+          Hủy kết bạn
+        </button>
+      );
+    }
+
+    if (profileData.request) {
+      if (profileData.request === "OUT") {
         return (
           <button
             onClick={cancelFriendRequest}
@@ -104,8 +138,8 @@ export default function ProfileHeader({ profileData, isOwnProfile = true, onProf
           >
             Hủy lời mời
           </button>
-        );
-      case "received":
+        );  
+      } else if (profileData.request === "IN") {
         return (
           <div className="flex gap-2">
             <button
@@ -122,27 +156,17 @@ export default function ProfileHeader({ profileData, isOwnProfile = true, onProf
             </button>
           </div>
         );
-      case "friend":
-        return (
-          <button
-            onClick={unfriend}
-            className="px-4 py-1 bg-red-500 hover:bg-red-600 text-white rounded text-sm"
-          >
-            Hủy kết bạn
-          </button>
-        );
-      case "none":
-        return (
-          <button
-            onClick={sendFriendRequest}
-            className="px-4 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm"
-          >
-            Kết bạn
-          </button>
-        );
-      default:
-        return null;
+      }
     }
+
+    return (
+      <button
+        onClick={sendFriendRequest}
+        className="px-4 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm"
+      >
+        Kết bạn
+      </button>
+    );
   };
 
   return (
@@ -159,16 +183,28 @@ export default function ProfileHeader({ profileData, isOwnProfile = true, onProf
             <h2 className="text-xl font-semibold">
               {profileData?.givenName || ""} {profileData?.familyName || ""}
             </h2>
-            {isOwnProfile ? (
-              <button
-                onClick={() => setIsEditModalOpen(true)}
-                className="px-4 py-1 border rounded-full text-sm text-gray-600 hover:bg-gray-100"
-              >
-                Chỉnh sửa hồ sơ
-              </button>
-            ) : (
-              renderFriendButton()
-            )}
+            <div className="flex">
+              {isOwnProfile ? (
+                <button
+                  onClick={() => setIsEditModalOpen(true)}
+                  className="px-4 py-1 border rounded-full text-sm text-gray-600 hover:bg-gray-100"
+                >
+                  Chỉnh sửa hồ sơ
+                </button>
+              ) : (
+                renderFriendButton()
+              )}
+              {!isOwnProfile && (
+                <div className="ml-2">
+                  <button
+                    onClick={handleBlockUser}
+                    className="px-4 py-1 bg-red-500 hover:bg-red-600 text-white rounded text-sm"
+                  >
+                    Chặn
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
 
           <p className="text-gray-500 text-sm">@{profileData?.username}</p>

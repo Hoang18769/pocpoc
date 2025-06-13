@@ -2,87 +2,81 @@
 
 import React, { useRef, useState } from "react";
 import Modal from "@/components/ui-components/Modal";
-import Image from "next/image";
-import { Trash2 } from "lucide-react";
-import ImageView from "../ui-components/ImageView";
 import api from "@/utils/axios";
-import ImagePreview from "../ui-components/imagePreview";
 import toast from "react-hot-toast";
+import ImagePreview from "../ui-components/imagePreview";
 
 export default function NewPostModal({ isOpen, onClose }) {
   const fileInputRef = useRef(null);
-  const [images, setImages] = useState([]);
+  const [media, setMedia] = useState([]);
   const [privacy, setPrivacy] = useState("PUBLIC");
   const [content, setContent] = useState("");
-const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleImageSelect = (e) => {
-    const files = Array.from(e.target.files);
-    const imageFiles = files.filter((file) => file.type.startsWith("image/"));
+  const handleMediaSelect = (files) => {
+    const mediaFiles = files.filter((file) =>
+      file.type.startsWith("image/") || file.type.startsWith("video/")
+    );
 
-    const newImages = imageFiles.map((file) => ({
+    const newMedia = mediaFiles.map((file) => ({
       file,
       preview: URL.createObjectURL(file),
+      type: file.type.startsWith("video/") ? "video" : "image",
     }));
 
-    setImages((prev) => [...prev, ...newImages]);
+    setMedia((prev) => [...prev, ...newMedia]);
+  };
+
+  const handleFileChange = (e) => {
+    handleMediaSelect(Array.from(e.target.files));
   };
 
   const handleDrop = (e) => {
     e.preventDefault();
-    const files = Array.from(e.dataTransfer.files);
-    const imageFiles = files.filter((file) => file.type.startsWith("image/"));
-
-    const newImages = imageFiles.map((file) => ({
-      file,
-      preview: URL.createObjectURL(file),
-    }));
-
-    setImages((prev) => [...prev, ...newImages]);
+    handleMediaSelect(Array.from(e.dataTransfer.files));
   };
 
   const handleClickUploadArea = () => {
     fileInputRef.current?.click();
   };
 
-  const handleRemoveImage = (index) => {
-    setImages((prev) => prev.filter((_, i) => i !== index));
+  const handleRemoveMedia = (index) => {
+    setMedia((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async () => {
-  if (images.length === 0 || !content || !privacy || isLoading) return;
+    if (media.length === 0 || !content || !privacy || isLoading) return;
 
-  setIsLoading(true);
-  const formData = new FormData();
-  formData.append("content", content);
-  formData.append("privacy", privacy);
-  images.forEach((img) => formData.append("files", img.file));
+    setIsLoading(true);
+    const formData = new FormData();
+    formData.append("content", content);
+    formData.append("privacy", privacy);
+    media.forEach((item) => formData.append("files", item.file));
 
-  try {
-    const res = await api.post("/v1/posts/post", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-    });
+    try {
+      const res = await api.post("/v1/posts/post", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
 
-    if (res.data.code === 200) {
-      toast.success("Đăng bài thành công");
-      onClose?.();
-      // Reset form
-      setImages([]);
-      setContent("");
-      setPrivacy("PUBLIC");
-    } else {
-      toast.error("Có lỗi xảy ra, vui lòng thử lại");
+      if (res.data.code === 200) {
+        toast.success("Đăng bài thành công");
+        onClose?.();
+        setMedia([]);
+        setContent("");
+        setPrivacy("PUBLIC");
+      } else {
+        console.log(res)
+        toast.error("Có lỗi xảy ra, vui lòng thử lại");
+      }
+    } catch (err) {
+      toast.error("Lỗi kết nối hoặc máy chủ.");
+      console.error("❌ Error posting:", err);
+    } finally {
+      setIsLoading(false);
     }
-  } catch (err) {
-    toast.error("Lỗi kết nối hoặc máy chủ.");
-    console.error("❌ Error posting:", err);
-  } finally {
-    setIsLoading(false);
-  }
-};
-
+  };
 
   return (
     <Modal isOpen={isOpen} onClose={onClose}>
@@ -97,48 +91,35 @@ const [isLoading, setIsLoading] = useState(false);
           </button>
         </div>
 
-        {/* Upload area (only when no images yet) */}
-        {images.length === 0 && (
+        {media.length === 0 ? (
           <div
             onClick={handleClickUploadArea}
             onDrop={handleDrop}
             onDragOver={(e) => e.preventDefault()}
             className="flex flex-col items-center justify-center border-2 border-dashed border-[var(--border)] rounded-lg p-10 text-gray-500 hover:border-[var(--primary)] cursor-pointer transition-colors space-y-2"
           >
-            <p className="text-sm">Choose file or drop photos here</p>
-            <div className="text-4xl">🖼️</div>
-            <div className="text-2xl">+</div>
+            <p className="text-sm">Chọn ảnh hoặc video, hoặc kéo thả vào đây</p>
+            <div className="text-4xl">📁</div>
             <input
               type="file"
-              accept="image/*"
+              accept="image/*,video/*"
               multiple
               ref={fileInputRef}
-              onChange={handleImageSelect}
+              onChange={handleFileChange}
               hidden
             />
           </div>
-        )}
-
-        {/* If images selected: show preview + form */}
-        {images.length > 0 && (
+        ) : (
           <div className="flex flex-col md:flex-row gap-6 p-4">
-            {/* Image preview - Left (50%) */}
             <div className="md:w-1/2 w-full">
               <ImagePreview
-  images={images}
-  onImageClick={(i) => setPreviewIndex(i)}
-  onDelete={(i) => {
-    const updated = [...images]
-    updated.splice(i, 1)
-    setImages(updated)
-  }}
-  onAdd={() => fileInputRef.current?.click()}
-/>
-
-
+                images={media}
+                onImageClick={(i) => {}}
+                onDelete={handleRemoveMedia}
+                onAdd={handleClickUploadArea}
+              />
             </div>
 
-            {/* Form - Right (50%) */}
             <div className="md:w-1/2 w-full flex flex-col gap-4">
               <div>
                 <label className="block text-sm font-medium mb-1">Privacy</label>
@@ -159,20 +140,19 @@ const [isLoading, setIsLoading] = useState(false);
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
                   rows={4}
-                  placeholder="Write something..."
+                  placeholder="Viết điều gì đó..."
                   className="w-full px-3 py-2 border rounded-md bg-[var(--input)] text-[var(--foreground)] resize-none"
                 />
               </div>
 
               <div className="flex justify-end mt-auto">
-               <button
-  onClick={handleSubmit}
-  disabled={isLoading}
-  className="px-4 py-2 rounded-md bg-[var(--primary)] text-white hover:bg-opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
->
-  {isLoading ? "Posting..." : "Post"}
-</button>
-
+                <button
+                  onClick={handleSubmit}
+                  disabled={isLoading}
+                  className="px-4 py-2 rounded-md bg-[var(--primary)] text-white hover:bg-opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isLoading ? "Posting..." : "Post"}
+                </button>
               </div>
             </div>
           </div>

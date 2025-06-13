@@ -8,9 +8,17 @@ const api = axios.create({
 
 let isRefreshing = false;
 let refreshSubscribers = [];
-
-// ✅ Event system cho socket reconnection
 const tokenEventListeners = [];
+
+// Helper function để kiểm tra môi trường client
+const isClient = typeof window !== "undefined";
+
+// Hàm safeLocalStorage để tránh lỗi khi chạy trên server
+const safeLocalStorage = {
+  getItem: (key) => isClient ? localStorage.getItem(key) : null,
+  setItem: (key, value) => isClient && localStorage.setItem(key, value),
+  removeItem: (key) => isClient && localStorage.removeItem(key)
+};
 
 export function onTokenRefresh(callback) {
   tokenEventListeners.push(callback);
@@ -28,20 +36,6 @@ function notifyTokenRefresh(newToken) {
       console.error('Error in token refresh callback:', error);
     }
   });
-}
-
-function onTokenRefreshed(newToken) {
-  refreshSubscribers.forEach(cb => cb(newToken));
-  refreshSubscribers = [];
-  
-  // ✅ Thông báo cho socket về token mới
-  if (newToken) {
-    notifyTokenRefresh(newToken);
-  }
-}
-
-function subscribeTokenRefresh(cb) {
-  refreshSubscribers.push(cb);
 }
 
 const PUBLIC_ENDPOINTS = [
@@ -64,7 +58,7 @@ api.interceptors.request.use(
     if (config.skipAuth || isPublicEndpoint(config.url)) {
       return config;
     }
-    const token = localStorage.getItem("accessToken");
+    const token = safeLocalStorage.getItem("accessToken");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -76,9 +70,9 @@ api.interceptors.request.use(
 async function handleTokenRefresh(originalRequest) {
   if (isRefreshing) {
     return new Promise((resolve, reject) => {
-      subscribeTokenRefresh(newToken => {
-        if (newToken) {
-          originalRequest.headers.Authorization = `Bearer ${newToken}`;
+      refreshSubscribers.push((token) => {
+        if (token) {
+          originalRequest.headers.Authorization = `Bearer ${token}`;
           resolve(api(originalRequest));
         } else {
           reject(new Error("Failed to refresh token"));
@@ -89,41 +83,37 @@ async function handleTokenRefresh(originalRequest) {
 
   isRefreshing = true;
   try {
-    const refreshInstance = axios.create({
-      baseURL: process.env.NEXT_PUBLIC_API_URL,
-      withCredentials: true,
-      timeout: 15000,
-      headers: { "Content-Type": "application/json" },
-    });
+    const { data } = await axios.post(
+      `${process.env.NEXT_PUBLIC_API_URL}/v1/auth/refresh`, 
+      {},
+      { 
+        withCredentials: true,
+        headers: { "Content-Type": "application/json" }
+      }
+    );
 
-    const { data } = await refreshInstance.post("/v1/auth/refresh", {});
     const newToken = data.body?.token;
     if (!newToken) throw new Error("No new token in refresh response");
 
-    // ✅ Cập nhật token mới
-    localStorage.setItem("accessToken", newToken);
-    document.cookie = `accessToken=${newToken}; path=/; max-age=300`; // 5 phút
+    // Cập nhật token mới
+    safeLocalStorage.setItem("accessToken", newToken);
+    if (isClient) {
+      document.cookie = `accessToken=${newToken}; path=/; max-age=${60 * 5}`; // 5 phút
+    }
     api.defaults.headers.common.Authorization = `Bearer ${newToken}`;
     originalRequest.headers.Authorization = `Bearer ${newToken}`;
 
-    console.log("🔄 Token refreshed successfully");
-    onTokenRefreshed(newToken);
+    // Thông báo cho các subscribers
+    refreshSubscribers.forEach(cb => cb(newToken));
+    refreshSubscribers = [];
+    notifyTokenRefresh(newToken);
+
     return api(originalRequest);
   } catch (refreshErr) {
     console.error("❌ Token refresh failed:", refreshErr);
-    // ❌ Refresh thất bại: xoá toàn bộ thông tin session
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("userName");
-    localStorage.removeItem("userId");
-    document.cookie = `accessToken=; path=/; max-age=0`;
-    delete api.defaults.headers.common.Authorization;
-    onTokenRefreshed(null);
-
-    // ✅ Thông báo socket về việc logout
-    notifyTokenRefresh(null);
-
-    if (typeof window !== "undefined") {
-      setTimeout(() => (window.location.href = "/register"), 100);
+    clearSession();
+    if (isClient) {
+      setTimeout(() => window.location.href = "/register", 1000);
     }
     return Promise.reject(refreshErr);
   } finally {
@@ -149,32 +139,27 @@ api.interceptors.response.use(
   }
 );
 
-// ✅ Hàm setAuthToken (dùng khi login thành công hoặc khởi tạo session)
 export function setAuthToken(token) {
   if (token) {
-    localStorage.setItem("accessToken", token);
-    document.cookie = `accessToken=${token}; path=/; max-age=300`;
+    safeLocalStorage.setItem("accessToken", token);
+    if (isClient) {
+      document.cookie = `accessToken=${token}; path=/; max-age=${60 * 5}`;
+    }
     api.defaults.headers.common.Authorization = `Bearer ${token}`;
-    
-    // ✅ Thông báo cho socket về token mới
     notifyTokenRefresh(token);
   } else {
-    localStorage.removeItem("accessToken");
-    document.cookie = `accessToken=; path=/; max-age=0`;
-    delete api.defaults.headers.common.Authorization;
-    
-    // ✅ Thông báo cho socket về việc logout
-    notifyTokenRefresh(null);
+    clearSession();
   }
 }
 
 export function getAuthToken() {
-  return localStorage.getItem("accessToken");
+  return safeLocalStorage.getItem("accessToken");
 }
 
 export function isTokenValid() {
-  const token = localStorage.getItem("accessToken");
+  const token = getAuthToken();
   if (!token) return false;
+  
   try {
     const [, payloadBase64] = token.split(".");
     const payload = JSON.parse(atob(payloadBase64));
@@ -185,14 +170,16 @@ export function isTokenValid() {
   }
 }
 
-// ✅ Hàm xoá session hoàn toàn (logout)
 export function clearSession() {
-  localStorage.removeItem("accessToken");
-  localStorage.removeItem("userName");
-  localStorage.removeItem("userId");
-  document.cookie = `accessToken=; path=/; max-age=0`;
-  delete api.defaults.headers.common.Authorization;
+  safeLocalStorage.removeItem("accessToken");
+  safeLocalStorage.removeItem("userName");
+  safeLocalStorage.removeItem("userId");
   
+  if (isClient) {
+    document.cookie = `accessToken=; path=/; max-age=0`;
+  }
+  
+  delete api.defaults.headers.common.Authorization;
   notifyTokenRefresh(null);
 }
 

@@ -2,7 +2,7 @@
 
 import {useEffect, useState } from "react"
 import Link from "next/link"
-import { Home, Search, Play, Heart, User, Settings, MessageCircle } from "lucide-react"
+import { Home, Search, Play, Heart, Users, User, Settings, MessageCircle, UserPen } from "lucide-react"
 
 export default function SidebarNavigation() {
   const [activeItem, setActiveItem] = useState("home")
@@ -12,8 +12,8 @@ export default function SidebarNavigation() {
     { id: "home", icon: Home, href: "/index" },
     { id: "search", icon: Search, href: "/search" },
     { id: "message", icon: MessageCircle, href: "/chats" },
-    { id: "favorites", icon: Heart, href: "/favorites" },
-    { id: "profile", icon: User, href: username ? `/profile/${username}` : "#" },
+    { id: "favorites", icon: Users, href: "/friends" },
+    { id: "profile", icon: UserPen, href: username ? `/profile/${username}` : "#" },
     { id: "setting", icon: Settings, href: "/settings" },
   ]
    useEffect(() => {

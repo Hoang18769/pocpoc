@@ -15,7 +15,7 @@ export default function ImagePreview({ images = [], onImageClick, onDelete, onAd
     const files = Array.from(e.target.files || [])
     if (files.length > 0) {
       onAdd?.(files)
-      e.target.value = null // reset input để chọn lại cùng file cũng hoạt động
+      e.target.value = null
     }
   }
 
@@ -35,13 +35,22 @@ export default function ImagePreview({ images = [], onImageClick, onDelete, onAd
           key={index}
           className="relative aspect-square rounded-lg overflow-hidden group bg-muted"
         >
-          <Image
-            src={img.preview}
-            alt={`Post image ${index + 1}`}
-            fill
-            unoptimized
-            className="object-cover"
-          />
+          {img.type === "video" ? (
+            <video
+              src={img.preview}
+              controls
+              className="object-cover w-full h-full"
+            />
+          ) : (
+            <Image
+              src={img.preview}
+              alt={`Post image ${index + 1}`}
+              fill
+              unoptimized
+              className="object-cover"
+            />
+          )}
+
           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-2">
             <button
               onClick={() => onImageClick?.(index)}
@@ -61,21 +70,19 @@ export default function ImagePreview({ images = [], onImageClick, onDelete, onAd
         </div>
       ))}
 
-      {/* Nút thêm ảnh */}
       <button
         onClick={handleAddClick}
         className="aspect-square rounded-lg flex items-center justify-center border border-dashed border-muted-foreground hover:bg-muted transition"
-        title="Thêm ảnh"
+        title="Thêm ảnh hoặc video"
         type="button"
       >
         <Plus className="w-6 h-6 text-muted-foreground" />
       </button>
 
-      {/* Input ẩn */}
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*"
+        accept="image/*,video/*"
         multiple
         onChange={handleFileChange}
         className="hidden"

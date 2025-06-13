@@ -1,7 +1,6 @@
-// src/utils/socket.js
 import SockJS from "sockjs-client";
 import { Client } from "@stomp/stompjs";
-import { getAuthToken, isTokenValid } from "./axios";
+import { getAuthToken, isTokenValid, onTokenRefresh } from "./axios";
 
 export function createStompClient(onConnect) {
   const client = new Client({
@@ -10,42 +9,49 @@ export function createStompClient(onConnect) {
       Authorization: "Bearer " + (getAuthToken() || ""),
     },
     debug: (str) => console.log("[STOMP DEBUG]", str),
-    reconnectDelay: 5000,
+    reconnectDelay: 5000, // auto reconnect
     onConnect: (frame) => {
       console.log("✅ STOMP connected", frame);
-      // Đảm bảo client đã connected trước khi gọi callback
       if (onConnect) onConnect(frame);
     },
     onDisconnect: () => console.warn("⚠️ STOMP disconnected"),
     onWebSocketClose: () => console.warn("⚠️ WebSocket closed"),
     onWebSocketError: (event) => console.error("❌ WebSocket error:", event),
+    onStompError: (frame) => {
+      console.error("❌ STOMP error:", frame.headers["message"] || frame.body);
+      // Nếu bị lỗi 403 hoặc lỗi xác thực, thử refresh token và reconnect
+      if (frame.headers["message"]?.includes("403") || frame.body?.includes("403")) {
+        console.log("🔄 Token invalid. Will try to refresh and reconnect...");
+        reconnectWithNewToken();
+      }
+    },
     beforeConnect: async () => {
-      const token = getAuthToken();
+      // Đợi token mới nếu token hiện tại hết hạn
+      let token = getAuthToken();
       if (!token || !isTokenValid()) {
-        console.log("🔄 Token expired or missing, waiting for refresh...");
-        await new Promise((r) => setTimeout(r, 500));
+        console.log("🔄 Waiting for token refresh...");
+        token = await waitForValidToken();
       }
       client.connectHeaders = {
-        Authorization: "Bearer " + (getAuthToken() || ""),
+        Authorization: "Bearer " + (token || ""),
       };
     },
   });
 
-  // Thêm phương thức helper để gửi tin nhắn
+  // Gửi tin nhắn
   client.sendMessage = (destination, message, headers = {}) => {
     if (!client.connected) {
       console.error("❌ Client not connected. Cannot send message.");
       return false;
     }
-    
     try {
       client.publish({
-        destination: destination,
+        destination,
         body: JSON.stringify(message),
         headers: {
           'content-type': 'application/json',
-          ...headers
-        }
+          ...headers,
+        },
       });
       return true;
     } catch (error) {
@@ -54,36 +60,52 @@ export function createStompClient(onConnect) {
     }
   };
 
-  // Thêm phương thức helper để subscribe
+  // Subscribe channel
   client.subscribeToChannel = (destination, callback, headers = {}) => {
     if (!client.connected) {
       console.error("❌ Client not connected. Cannot subscribe.");
       return null;
     }
-
     return client.subscribe(destination, callback, headers);
   };
+
+  // Reconnect with refreshed token
+  async function reconnectWithNewToken() {
+    try {
+      const token = await waitForValidToken();
+      client.connectHeaders = {
+        Authorization: "Bearer " + token,
+      };
+      client.deactivate().then(() => {
+        client.activate(); // reconnect
+      });
+    } catch (err) {
+      console.error("❌ Failed to refresh token and reconnect:", err);
+    }
+  }
 
   return client;
 }
 
-// Helper function để đợi client kết nối
-export function waitForConnection(client, timeout = 5000) {
+// Đợi token hợp lệ thông qua event listener
+function waitForValidToken(timeout = 10000) {
   return new Promise((resolve, reject) => {
-    if (client.connected) {
-      resolve(client);
-      return;
+    const token = getAuthToken();
+    if (token && isTokenValid()) {
+      return resolve(token);
     }
 
     const timeoutId = setTimeout(() => {
-      reject(new Error("Connection timeout"));
+      unsubscribe();
+      reject(new Error("Timeout waiting for valid token"));
     }, timeout);
 
-    const originalOnConnect = client.onConnect;
-    client.onConnect = (frame) => {
-      clearTimeout(timeoutId);
-      if (originalOnConnect) originalOnConnect(frame);
-      resolve(client);
-    };
+    const unsubscribe = onTokenRefresh((newToken) => {
+      if (newToken && isTokenValid()) {
+        clearTimeout(timeoutId);
+        unsubscribe();
+        resolve(newToken);
+      }
+    });
   });
 }
