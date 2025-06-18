@@ -6,6 +6,7 @@ import toast from "react-hot-toast";
 
 import useChat from "@/hooks/useChat";
 import useSendMessage from "@/hooks/useSendMessageSocket";
+import useAppStore from "@/store/ZustandStore";
 import api from "@/utils/axios";
 
 // Import các components đã tách
@@ -14,7 +15,7 @@ import MessageItem from "./MessageItem";
 import ChatInput from "./ChatInput";
 import FilePreviewInChat from "../ui-components/FilePreviewInChat";
 
-export default function ChatBox({ chatId, targetUser, onBack }) {
+export default function ChatBox({ chatId, targetUser, onBack, onChatCreated }) {
   const pathname = usePathname();
   const showBackButton = pathname !== "/chats";
 
@@ -24,20 +25,37 @@ export default function ChatBox({ chatId, targetUser, onBack }) {
   const [editingMessage, setEditingMessage] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
   const [filePreview, setFilePreview] = useState(null);
+  const [currentChatId, setCurrentChatId] = useState(chatId);
+  const [isNewChat, setIsNewChat] = useState(!chatId);
   const scrollRef = useRef(null);
 
-  const { messages, loading } = useChat(chatId);
+  // Store actions
+  const fetchChatList = useAppStore((state) => state.fetchChatList);
+  const selectChat = useAppStore((state) => state.selectChat);
+  const clearChatSelection = useAppStore((state) => state.clearChatSelection);
+
+  // Chỉ gọi useChat khi có chatId
+  const { messages, loading } = useChat(currentChatId);
   const { sendMessage, isConnected } = useSendMessage({
-    chatId,
+    chatId: currentChatId,
     receiverUsername: targetUser?.username,
   });
 
+  // Cập nhật currentChatId khi chatId prop thay đổi
   useEffect(() => {
-    console.log(messages)
-    const timeout = setTimeout(() => {
-      scrollRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, 0);
-    return () => clearTimeout(timeout);
+    if (chatId !== currentChatId) {
+      setCurrentChatId(chatId);
+      setIsNewChat(!chatId);
+    }
+  }, [chatId]);
+
+  useEffect(() => {
+    if (messages?.length > 0) {
+      const timeout = setTimeout(() => {
+        scrollRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, 0);
+      return () => clearTimeout(timeout);
+    }
   }, [messages]);
 
   useEffect(() => {
@@ -60,12 +78,65 @@ export default function ChatBox({ chatId, targetUser, onBack }) {
     };
   }, [filePreview]);
 
+  // ✅ Tạo chat mới với luồng hoàn chỉnh
+  const createNewChat = async (message) => {
+    try {
+      console.log("🚀 Creating new chat with:", { 
+        receiverUsername: targetUser?.username, 
+        message 
+      });
+
+      const response = await api.post('/v1/chat/send', {
+        username: targetUser?.username,
+        text: message
+      });
+      
+      if (response.data?.body.chatId) {
+        const newChatId = response.data.body.chatId;
+        console.log("✅ New chat created with ID:", newChatId);
+        
+        // Cập nhật state local
+        setCurrentChatId(newChatId);
+        setIsNewChat(false);
+        
+        // ✅ Fetch lại chatlist để cập nhật store
+        await fetchChatList();
+        
+        // ✅ Update store selection
+        selectChat(newChatId);
+        
+        // ✅ Callback để parent component cập nhật
+        if (onChatCreated) {
+          onChatCreated(newChatId, targetUser);
+        }
+        
+        toast.success("Đã tạo cuộc trò chuyện mới!");
+        return newChatId;
+      }
+      throw new Error('Không thể tạo chat mới');
+    } catch (error) {
+      console.error('❌ Lỗi tạo chat:', error);
+      toast.error('Không thể tạo cuộc trò chuyện mới');
+      throw error;
+    }
+  };
+
   const handleSend = async () => {
     const trimmed = input.trim();
-    if (!trimmed || !isConnected) return;
+    if (!trimmed) return;
 
     try {
-      await sendMessage(trimmed);
+      if (isNewChat) {
+        // Tạo chat mới với tin nhắn đầu tiên
+        await createNewChat(trimmed);
+      } else {
+        // Gửi tin nhắn bình thường
+        if (!isConnected) {
+          toast.error('Chưa kết nối đến server');
+          return;
+        }
+        await sendMessage(trimmed);
+      }
       setInput("");
     } catch (err) {
       console.error("❌ Lỗi gửi tin nhắn:", err);
@@ -96,7 +167,14 @@ export default function ChatBox({ chatId, targetUser, onBack }) {
 
   const handleFileSelect = async (e) => {
     const file = e.target.files?.[0];
-    if (!file || !chatId) return;
+    if (!file) return;
+
+    // Nếu là chat mới, không cho phép gửi file trước khi có chat
+    if (isNewChat) {
+      toast.error("Vui lòng gửi tin nhắn đầu tiên trước khi gửi file");
+      e.target.value = null;
+      return;
+    }
 
     // Giới hạn kích thước file (ví dụ: 10MB)
     const maxSize = 10 * 1024 * 1024; // 10MB
@@ -120,7 +198,7 @@ export default function ChatBox({ chatId, targetUser, onBack }) {
   };
 
   const handleSendFile = async () => {
-    if (!selectedFile || !chatId || !targetUser?.username) return;
+    if (!selectedFile || !currentChatId || !targetUser?.username) return;
 
     const formData = new FormData();
     formData.append("attachment", selectedFile);
@@ -128,9 +206,8 @@ export default function ChatBox({ chatId, targetUser, onBack }) {
 
     try {
       setUploading(true);
-      const res = await api.post(`/v1/chat/send-file`, formData, {
-      });
-      console.log(res)
+      const res = await api.post(`/v1/chat/send-file`, formData);
+      console.log(res);
       if (res.data) {
         toast.success("File đã được gửi thành công!");
         handleCancelFile();
@@ -153,6 +230,7 @@ export default function ChatBox({ chatId, targetUser, onBack }) {
   const handleMessageClick = (msg) => {
     const isSelf = msg.sender?.id !== targetUser?.id;
     if (isSelf && !msg.deleted) {
+      console.log(msg.id);
       setSelectedMessage(selectedMessage === msg.id ? null : msg.id);
     }
   };
@@ -169,6 +247,7 @@ export default function ChatBox({ chatId, targetUser, onBack }) {
   };
 
   const handleEditMessage = (msg) => {
+    console.log("📝 Sửa tin nhắn:", msg);
     setEditingMessage(msg);
     setInput(msg.content);
     setSelectedMessage(null);
@@ -188,7 +267,7 @@ export default function ChatBox({ chatId, targetUser, onBack }) {
         messagesId: editingMessage.id,
         text: trimmed,
       });
-      if(res.data.code === 200){
+      if (res.data.code === 200) {
         setEditingMessage(null);
         setInput("");
         toast.success("Sửa tin nhắn thành công!");
@@ -204,23 +283,32 @@ export default function ChatBox({ chatId, targetUser, onBack }) {
       {/* Header */}
       <ChatHeader 
         targetUser={targetUser}
-        isConnected={isConnected}
+        isConnected={isNewChat ? true : isConnected} // Hiển thị connected cho chat mới
         onBack={onBack}
         showBackButton={showBackButton}
       />
 
       {/* Messages */}
       <div className="flex-1 px-4 py-3 overflow-y-auto space-y-2 bg-transparent">
-        {loading ? (
+        {loading && currentChatId ? (
           <p className="text-sm text-[var(--muted-foreground)]">
             Đang tải tin nhắn...
           </p>
-        ) : messages.length === 0 ? (
+        ) : isNewChat ? (
+          <div className="text-center py-8">
+            <p className="text-sm text-[var(--muted-foreground)]">
+              Bắt đầu cuộc trò chuyện với {targetUser?.displayName || targetUser?.username}
+            </p>
+            <p className="text-xs text-[var(--muted-foreground)] mt-2">
+              Nhập tin nhắn để tạo cuộc trò chuyện mới
+            </p>
+          </div>
+        ) : messages?.length === 0 ? (
           <p className="text-sm text-[var(--muted-foreground)] text-center">
             Chưa có tin nhắn nào
           </p>
         ) : (
-          messages.slice().reverse().map((msg) => (
+          messages?.slice().reverse().map((msg) => (
             <MessageItem
               key={msg.id}
               msg={msg}
@@ -246,7 +334,7 @@ export default function ChatBox({ chatId, targetUser, onBack }) {
       <ChatInput
         input={input}
         setInput={setInput}
-        isConnected={isConnected}
+        isConnected={isNewChat ? true : isConnected}
         selectedFile={selectedFile}
         editingMessage={editingMessage}
         uploading={uploading}
@@ -257,6 +345,7 @@ export default function ChatBox({ chatId, targetUser, onBack }) {
         onCancelFile={handleCancelFile}
         onFileSelect={handleFileSelect}
         onKeyDown={handleKeyDown}
+        placeholder={isNewChat ? `Nhắn tin cho ${targetUser?.displayName || targetUser?.username}...` : "Nhập tin nhắn..."}
       />
     </div>
   );

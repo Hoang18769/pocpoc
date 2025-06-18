@@ -1,7 +1,8 @@
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-    images: {
-    domains: ['pngdownload.io','picsum.photos','localhost'],
+  images: {
+    domains: ['pngdownload.io', 'picsum.photos', 'localhost'],
     remotePatterns: [
       {
         protocol: 'http',
@@ -9,7 +10,7 @@ const nextConfig = {
         port: '80',
         pathname: '/v1/files/**',
       },
-    ],  // Thêm domain bạn muốn load ảnh từ đó
+    ],
   },
 };
 

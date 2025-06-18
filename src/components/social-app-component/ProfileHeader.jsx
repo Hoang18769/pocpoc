@@ -6,19 +6,32 @@ import Modal from "../ui-components/Modal";
 import EditProfileModal from "./EditProfile";
 import api from "@/utils/axios";
 import toast from "react-hot-toast";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
+import useAppStore from "@/store/ZustandStore";
 
-export default function ProfileHeader({ profileData, isOwnProfile = true, onProfileUpdate }) {
-  const [activeTab, setActiveTab] = useState("posts");
+export default function ProfileHeader({ 
+  profileData, 
+  isOwnProfile = true, 
+  activeTab = "posts", // Nhận activeTab từ parent
+  onTabChange, // Nhận callback để thay đổi tab
+  onProfileUpdate 
+}) {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const avatar = profileData.profilePictureUrl;
   const { username: routeUsername } = useParams();
-  const username=profileData.username;
+  const router = useRouter();
+
+  const username = profileData.username;
+  const navigateToChat = useAppStore((state) => state.navigateToChat);
+  const selectChat = useAppStore((state) => state.selectChat);
+  const showVirtualChat = useAppStore((state) => state.showVirtualChat);
+  const chatList = useAppStore((state) => state.chatList);
+
   const handleBlockUser = async () => {
     const confirm = window.confirm(`Bạn có chắc muốn chặn ${routeUsername}?`);
     if (!confirm) return;
 
-    try { 
+    try {
       const res = await api.post(`/v1/blocks/${routeUsername}`);
       if (res.data.code === 200) {
         alert(`Đã chặn ${routeUsername}`);
@@ -36,32 +49,66 @@ export default function ProfileHeader({ profileData, isOwnProfile = true, onProf
     setIsEditModalOpen(false);
   };
 
+const handleChatClick = () => {
+  const targetUserId = profileData.id;
+  const targetUsername = profileData.username;
+
+  console.log("🔍 handleChatClick:", { targetUserId, targetUsername });
+
+  if (!targetUserId) {
+    toast.error("Không thể tìm thấy thông tin người dùng");
+    return;
+  }
+
+  // ✅ Tìm chat theo cả userId và username (khớp với cấu trúc store)
+  const existingChat = chatList.find(chat => {
+    return chat.target?.id === targetUserId || 
+           chat.target?.username === targetUsername;
+  });
+
+  console.log("🎯 Existing chat found:", existingChat);
+
+  if (existingChat) {
+    // ✅ Sử dụng đúng field name từ store
+    const chatId = existingChat.chatId;
+    console.log("✅ Selecting existing chat:", chatId);
+    
+    selectChat(chatId); // ✅ Chỉ truyền chatId, không cần target
+    
+    router.push('/chats');
+    return;
+  }
+
+  // ✅ Tạo virtual chat với đúng structure
+  const virtualChatData = {
+    username: profileData.username,
+    givenName: profileData.givenName,
+    familyName: profileData.familyName,
+    profilePictureUrl: profileData.profilePictureUrl,
+    online: profileData.online || false
+  };
+
+  console.log("🆕 Creating virtual chat:", virtualChatData);
+  showVirtualChat(targetUserId, virtualChatData);
+  
+  router.push('/chats');
+};
+
   const cancelFriendRequest = async () => {
     try {
-      const res = await api.delete(`/v1/friend-request/delete/${username}`);
-      console.log(res);
+      await api.delete(`/v1/friend-request/delete/${username}`);
       toast.success("Đã hủy lời mời kết bạn");
-      // Cập nhật UI ngay lập tức
-      onProfileUpdate({
-        ...profileData,
-        request: null
-      });
+      onProfileUpdate({ ...profileData, request: null });
     } catch (error) {
-      console.log(error)
       toast.error("Lỗi khi hủy lời mời");
     }
   };
 
   const declineFriendRequest = async () => {
     try {
-      const res = await api.delete(`/v1/friend-request/delete/${username}`);
-      console.log(res);
+      await api.delete(`/v1/friend-request/delete/${username}`);
       toast.success("Đã từ chối lời mời");
-      // Cập nhật UI ngay lập tức
-      onProfileUpdate({
-        ...profileData,
-        request: null
-      });
+      onProfileUpdate({ ...profileData, request: null });
     } catch (error) {
       toast.error("Lỗi khi từ chối lời mời");
     }
@@ -71,12 +118,8 @@ export default function ProfileHeader({ profileData, isOwnProfile = true, onProf
     try {
       const res = await api.post(`/v1/friend-request/send/${username}`);
       if (res.data.code === 200) {
-              toast.error("Gửi lời mời thành công");
-
-        onProfileUpdate({
-          ...profileData,
-          request:  "OUT" 
-        });
+        toast.success("Gửi lời mời thành công");
+        onProfileUpdate({ ...profileData, request: "OUT" });
       }
     } catch (error) {
       console.error("Lỗi gửi lời mời:", error);
@@ -88,7 +131,6 @@ export default function ProfileHeader({ profileData, isOwnProfile = true, onProf
       const res = await api.post(`/v1/friend-request/accept/${username}`);
       if (res.data.code === 200) {
         toast.success("Đã chấp nhận kết bạn");
-        // Cập nhật UI ngay lập tức
         onProfileUpdate({
           ...profileData,
           friend: true,
@@ -103,10 +145,8 @@ export default function ProfileHeader({ profileData, isOwnProfile = true, onProf
 
   const unfriend = async () => {
     try {
-      const res = await api.delete(`/v1/friends/${username}`);
-      console.log(res);
+      await api.delete(`/v1/friends/${username}`);
       toast.success("Đã hủy kết bạn");
-      // Cập nhật UI ngay lập tức
       onProfileUpdate({
         ...profileData,
         isFriend: false,
@@ -138,7 +178,7 @@ export default function ProfileHeader({ profileData, isOwnProfile = true, onProf
           >
             Hủy lời mời
           </button>
-        );  
+        );
       } else if (profileData.request === "IN") {
         return (
           <div className="flex gap-2">
@@ -169,9 +209,15 @@ export default function ProfileHeader({ profileData, isOwnProfile = true, onProf
     );
   };
 
+  // Hàm xử lý khi người dùng click vào tab
+  const handleTabClick = (tabName) => {
+    if (onTabChange) {
+      onTabChange(tabName);
+    }
+  };
+
   return (
     <div className="w-full">
-      {/* Info Section */}
       <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6 p-4 sm:p-6">
         <Avatar
           src={avatar}
@@ -183,7 +229,7 @@ export default function ProfileHeader({ profileData, isOwnProfile = true, onProf
             <h2 className="text-xl font-semibold">
               {profileData?.givenName || ""} {profileData?.familyName || ""}
             </h2>
-            <div className="flex">
+            <div className="flex gap-2">
               {isOwnProfile ? (
                 <button
                   onClick={() => setIsEditModalOpen(true)}
@@ -195,7 +241,13 @@ export default function ProfileHeader({ profileData, isOwnProfile = true, onProf
                 renderFriendButton()
               )}
               {!isOwnProfile && (
-                <div className="ml-2">
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleChatClick}
+                    className="px-4 py-1 bg-purple-500 hover:bg-purple-600 text-white rounded text-sm"
+                  >
+                    Nhắn tin
+                  </button>
                   <button
                     onClick={handleBlockUser}
                     className="px-4 py-1 bg-red-500 hover:bg-red-600 text-white rounded text-sm"
@@ -224,7 +276,7 @@ export default function ProfileHeader({ profileData, isOwnProfile = true, onProf
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* Tab Navigation - Sử dụng activeTab từ props và gọi onTabChange */}
       <div className="flex justify-around text-sm border-t mt-4 pt-2">
         <button
           className={`flex items-center gap-1 ${
@@ -232,26 +284,25 @@ export default function ProfileHeader({ profileData, isOwnProfile = true, onProf
               ? "text-blue-600 font-medium border-b-2 border-blue-600 pb-1"
               : "text-gray-500 hover:text-black"
           }`}
-          onClick={() => setActiveTab("posts")}
+          onClick={() => handleTabClick("posts")}
         >
           🧱 Bài viết
         </button>
         <button
           className={`flex items-center gap-1 ${
-            activeTab === "photos"
+            activeTab === "file"
               ? "text-blue-600 font-medium border-b-2 border-blue-600 pb-1"
               : "text-gray-500 hover:text-black"
           }`}
-          onClick={() => setActiveTab("photos")}
+          onClick={() => handleTabClick("file")}
         >
-          🖼 Ảnh
+          🖼 Ảnh và video
         </button>
         <button className="flex items-center gap-1 text-gray-400 cursor-not-allowed" disabled>
           💾 Đã lưu
         </button>
       </div>
 
-      {/* Edit Profile Modal */}
       <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)}>
         <EditProfileModal profileData={profileData} onSave={handleSaveProfile} />
       </Modal>

@@ -6,32 +6,6 @@ import Image from "next/image";
 import PostCard from "@/components/social-app-component/PostCard";
 import avt_ex from "@/assests/photo/AfroAvatar.png"
 import { Children } from "react";
-const post = {
-  user: {
-    name: "Nguyễn Văn A",
-    avatar: "/assets/photo/avatar1.png",
-  },
-  time: "57 minutes ago",
-  content: "Lorem ipsum dolor sit amet. Hic neque vitae sit vero explicabo...",
-  image: "/assets/photo/post-img.jpg",
-  likes: "32.8k",
-  latestComment: {
-    user: "name",
-    content: "Lorem ipsum dolor sit amet.",
-  },
-  totalComments: 39,
-}
-  const users = [
-    { name: "Alex Johnson", lastOnline: "5 minutes ago", avatar: "/placeholder.svg?height=100&width=100" },
-    { name: "Sarah Williams", lastOnline: "59 minutes ago", avatar: "/placeholder.svg?height=100&width=100" },
-    { name: "Michael Brown", lastOnline: "2 hours ago", avatar: "/placeholder.svg?height=100&width=100" },
-    {
-      name: "Emily Davis with a very long name that should truncate",
-      lastOnline: "3 hours ago",
-      avatar: "/placeholder.svg?height=100&width=100",
-    },
-  ]
-
 export default function Home() {
 
   return (

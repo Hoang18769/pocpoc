@@ -1,15 +1,55 @@
-import { useMinLoading } from "@/hooks/useMinLoading"
-import { fetchNotifications } from "@/hooks/fetchNotification"
+import { useEffect } from 'react';
+import useAppStore from '@/store/ZustandStore';
+
+function formatNotificationText(n) {
+  const name = n.creator?.givenName || "Người dùng";
+  switch (n.action) {
+    case "SENT_ADD_FRIEND_REQUEST":
+      return `${name} đã gửi lời mời kết bạn 💌`;
+    case "BE_FRIEND":
+      return `${name} đã trở thành bạn bè 👥`;
+    case "POST":
+      return `${name} đã đăng một bài viết mới`;
+    case "SHARE":
+      return `${name} đã chia sẻ một bài viết mới`;
+    case "LIKE_POST":
+      return `${name} đã thích bài viết của bạn ❤️`;
+    case "COMMENT":
+      return `${name} đã bình luận về bài viết của bạn`;
+    case "REPLY_COMMENT":
+      return `${name} đã trả lời bình luận`;
+    case "ACCEPTED_FRIEND_REQUEST":
+      return `${name} đã chấp nhận lời mời kết bạn 🤝`;
+    case "NEW_MESSAGE":
+      return `${name} đã nhắn tin cho bạn 💬`;
+    default:
+      return `🔔 Có thông báo mới từ ${name}`;
+  }
+}
 
 export default function NotificationList() {
-  const { loading, data: notifications = [], error } = useMinLoading(
-    () => {
-      const token = localStorage.getItem("accessToken")
-      return fetchNotifications(token)
-    },
-    [], // 👈 deps là array literal hợp lệ
-    1000
-  )
+  const { 
+    notifications, 
+    isLoadingNotifications: loading, 
+    error,
+    ensureNotificationsLoaded,
+    markNotificationAsRead 
+  } = useAppStore();
+
+  useEffect(() => {
+    // Tự động fetch notifications nếu danh sách rỗng
+    ensureNotificationsLoaded();
+  }, [ensureNotificationsLoaded]);
+
+  const handleNotificationClick = (notification) => {
+    // Mark as read when clicked
+    if (!notification.isRead) {
+      markNotificationAsRead(notification.id);
+    }
+    
+    // Handle navigation based on notification type
+    // You can add navigation logic here based on notification.action
+  };
 
   return (
     <section className="p-4">
@@ -25,22 +65,34 @@ export default function NotificationList() {
         <ul className="space-y-3">
           {notifications.map((n, idx) => (
             <li
-              key={idx}
-              className="bg-[var(--card)] border border-[var(--border)] p-3 rounded-xl shadow-sm"
+              key={n.id || idx}
+              onClick={() => handleNotificationClick(n)}
+              className={`
+                bg-[var(--card)] border border-[var(--border)] p-3 rounded-xl shadow-sm
+                cursor-pointer hover:bg-[var(--accent)] transition-colors
+                ${!n.isRead ? 'ring-2 ring-blue-500/20 bg-blue-50/50' : ''}
+              `}
             >
-              <p className="text-sm text-[var(--foreground)] font-medium">
-                {n.creator?.givenName} • {n.action}
-              </p>
-              <time
-                className="block text-xs text-[var(--muted-foreground)] mt-1"
-                dateTime={n.sentAt}
-              >
-                {new Date(n.sentAt).toLocaleString()}
-              </time>
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <p className="text-sm text-[var(--foreground)] font-medium">
+                    {formatNotificationText(n)}
+                  </p>
+                  <time
+                    className="block text-xs text-[var(--muted-foreground)] mt-1"
+                    dateTime={n.sentAt}
+                  >
+                    {new Date(n.sentAt).toLocaleString()}
+                  </time>
+                </div>
+                {!n.isRead && (
+                  <div className="w-2 h-2 bg-blue-500 rounded-full ml-2 mt-1 flex-shrink-0" />
+                )}
+              </div>
             </li>
           ))}
         </ul>
       )}
     </section>
-  )
+  );
 }

@@ -1,33 +1,42 @@
 "use client";
 import { usePathname } from "next/navigation";
-import useChatList from "@/hooks/useChatList";
 import { ChevronDown, ChevronUp, SearchIcon } from "lucide-react";
 import ChatItem from "./ChatItem";
 import Input from "../ui-components/Input";
 import Avatar from "../ui-components/Avatar";
 import { useEffect, useRef, useState } from "react";
 import api from "@/utils/axios";
+import useAppStore from "@/store/ZustandStore";
 
 export default function ChatList({ onSelectChat, selectedChatId }) {
   const pathname = usePathname();
-  const { chats, loading, error, markChatAsRead } = useChatList();
+  
+  // Zustand store
+  const { 
+    chatList, 
+    isLoadingChats, 
+    fetchChatList,
+    markChatAsRead,
+    error: storeError 
+  } = useAppStore();
+  
   const [expanded, setExpanded] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [searchResults, setSearchResults] = useState(null);
   const [isSearching, setIsSearching] = useState(false);
-  const [unreadCounts, setUnreadCounts] = useState({});
+  // ❌ Removed unreadCounts local state - use store data directly
   const listRef = useRef(null);
 
   const isChatsPage = pathname === "/chats";
 
-  // Initialize unread counts
+  // Fetch data on mount if store is empty
   useEffect(() => {
-    const counts = {};
-    chats.forEach(chat => {
-      counts[chat.chatId] = chat.notReadMessageCount || 0;
-    });
-    setUnreadCounts(counts);
-  }, [chats]);
+    if (chatList.length === 0 && !isLoadingChats) {
+      fetchChatList();
+    }
+  }, [chatList.length, isLoadingChats, fetchChatList]);
+
+  // ❌ Removed unread counts initialization - use store data directly
 
   // Auto-expand on chats page
   useEffect(() => {
@@ -39,32 +48,17 @@ export default function ChatList({ onSelectChat, selectedChatId }) {
     if (listRef.current) {
       listRef.current.scrollTop = listRef.current.scrollHeight;
     }
-  }, [chats]);
+  }, [chatList]);
 
   const handleChatSelect = async (chat) => {
-    // Immediate UI update
-    setUnreadCounts(prev => ({
-      ...prev,
-      [chat.chatId]: 0
-    }));
-
-    // Mark as read in backend
-    try {
-      if (markChatAsRead) {
-        await markChatAsRead(chat.chatId);
-      }
-    } catch (err) {
-      console.error("Failed to mark chat as read:", err);
-      // Rollback UI if API fails
-      setUnreadCounts(prev => ({
-        ...prev,
-        [chat.chatId]: chat.notReadMessageCount || 0
-      }));
-      return;
-    }
-
+    // Use consistent field name - check store structure first
+    const chatId = chat.chatId || chat.id;
+    
+    // Call store's markChatAsRead to update store state
+    await markChatAsRead(chatId);
+    
     // Notify parent component
-    onSelectChat(chat.chatId, chat.target);
+    onSelectChat(chatId, chat.target);
   };
 
   // Debounced search API call
@@ -87,18 +81,25 @@ export default function ChatList({ onSelectChat, selectedChatId }) {
       } finally {
         setIsSearching(false);
       }
-    }, 3000);
+    }, 1000);
 
     return () => clearTimeout(timeout);
   }, [searchTerm]);
 
-  const filteredChats = searchResults ?? chats;
+  const filteredChats = searchResults ?? chatList;
 
+  // Fix unique chats logic - use consistent field
   const uniqueChats = [
-    ...new Map(chats.map(chat => [chat.target.userId, chat])).values(),
+    ...new Map(
+      chatList.map(chat => [
+        chat.target?.userId || chat.target?.id, 
+        chat
+      ])
+    ).values(),
   ];
 
-  if (loading) {
+  // Loading state
+  if (isLoadingChats && chatList.length === 0) {
     return (
       <div className="space-y-3 p-4 animate-pulse">
         {[...Array(5)].map((_, i) => (
@@ -108,7 +109,8 @@ export default function ChatList({ onSelectChat, selectedChatId }) {
     );
   }
 
-  if (error) {
+  // Error state
+  if (storeError) {
     return (
       <div className="p-4 text-center text-sm text-destructive">
         Failed to load chats. Please try again.
@@ -116,7 +118,8 @@ export default function ChatList({ onSelectChat, selectedChatId }) {
     );
   }
 
-  if (chats.length === 0) {
+  // Empty state
+  if (!isLoadingChats && chatList.length === 0) {
     return (
       <div className="p-4 text-center text-muted-foreground">
         No conversations yet
@@ -124,6 +127,7 @@ export default function ChatList({ onSelectChat, selectedChatId }) {
     );
   }
 
+  // Collapsed state
   if (!expanded && !isChatsPage) {
     return (
       <div
@@ -135,12 +139,12 @@ export default function ChatList({ onSelectChat, selectedChatId }) {
           {uniqueChats.slice(0, 3).map((chat, i) => (
             <div key={i} className="relative">
               <Avatar
-                src={chat.target.profilePictureUrl}
-                alt={`${chat.target.givenName} ${chat.target.familyName}`}
+                src={chat.target?.profilePictureUrl}
+                alt={`${chat.target?.givenName} ${chat.target?.familyName}`}
                 size="sm"
                 className="border-2 border-background"
               />
-              {chat.target.online && (
+              {chat.target?.online && (
                 <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border border-background" />
               )}
             </div>
@@ -148,7 +152,7 @@ export default function ChatList({ onSelectChat, selectedChatId }) {
         </div>
         <div className="flex items-center gap-2 ml-2">
           <span className="text-sm text-muted-foreground">
-            {chats.length > 3 ? `+${chats.length - 3} more` : `${chats.length} chats`}
+            {chatList.length > 3 ? `+${chatList.length - 3} more` : `${chatList.length} chats`}
           </span>
           <ChevronDown className="h-4 w-4 text-muted-foreground" />
         </div>
@@ -156,6 +160,7 @@ export default function ChatList({ onSelectChat, selectedChatId }) {
     );
   }
 
+  // Expanded state
   return (
     <div className="w-full max-w-md mx-auto bg-background flex flex-col border rounded-lg overflow-hidden h-full shadow-sm">
       {!isChatsPage && (
@@ -193,12 +198,9 @@ export default function ChatList({ onSelectChat, selectedChatId }) {
             .reverse()
             .map((chat) => (
               <ChatItem
-                key={chat.chatId}
-                chat={{
-                  ...chat,
-                  notReadMessageCount: unreadCounts[chat.chatId] || 0
-                }}
-                selected={selectedChatId === chat.chatId}
+                key={chat.chatId || chat.id}
+                chat={chat} // ✅ Use store data directly, no local state override
+                selected={selectedChatId === (chat.chatId || chat.id)}
                 onClick={() => handleChatSelect(chat)}
               />
             ))

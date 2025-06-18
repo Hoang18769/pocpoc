@@ -75,7 +75,7 @@ export default function FriendPage() {
   }, [activeTab]);
 
   const handleAction = async (userId, actionType) => {
-    console.log(userId)
+    console.log("username",userId)
     const previousUsers = [...users];
     setUsers(prev => prev.filter(user => user.uuid !== userId));
     setActionLoading(prev => ({ ...prev, [userId]: true }));
@@ -121,8 +121,7 @@ export default function FriendPage() {
   };
 
   const renderActionButton = (user) => {
-    console.log(user)
-    const isLoading = actionLoading[user.uuid];
+    const isLoading = actionLoading[user.username];
     const baseClass = "px-3 py-1 text-sm rounded-md transition-colors flex items-center justify-center min-w-[100px]";
 
     const buttonConfig = {
@@ -144,7 +143,7 @@ export default function FriendPage() {
           {currentConfig.map((btn) => (
             <button
               key={btn.action}
-              onClick={() => handleAction(user.uuid, btn.action)}
+              onClick={() => handleAction(user.username, btn.action)}
               disabled={isLoading}
               className={`${baseClass} ${btn.style} ${btn.minWidth || ""}`}
             >

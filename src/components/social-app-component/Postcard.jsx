@@ -23,8 +23,10 @@ export default function PostCard({ post, liked, onLikeToggle, size = "default", 
   const [newContent, setNewContent] = useState(post.content || "")
   const [newPrivacy, setNewPrivacy] = useState(post.privacy || "PUBLIC")
   const [loading, setLoading] = useState(false)
-  const router = useRouter()
+  const [comments, setComments] = useState([])
+  const [loadingComments, setLoadingComments] = useState(false)
 
+  const router = useRouter()
   const isModalOpen = activeImageIndex !== null || showModal
 
   useEffect(() => {
@@ -33,6 +35,27 @@ export default function PostCard({ post, liked, onLikeToggle, size = "default", 
     window.addEventListener("resize", checkScreenSize)
     return () => window.removeEventListener("resize", checkScreenSize)
   }, [])
+
+  useEffect(() => {
+    if (isModalOpen) fetchComments()
+  }, [isModalOpen])
+
+  const fetchComments = async () => {
+    if (loadingComments || comments.length > 0) return
+    setLoadingComments(true)
+    try {
+      const res = await api.get(`/v1/comments/of-post/${post.id}`, {
+        params: { page: 0, size: 50 }
+      })
+      console.log(res)
+      setComments(res.data.body || [])
+    } catch (err) {
+      toast.error("Không thể tải bình luận")
+      console.error(err)
+    } finally {
+      setLoadingComments(false)
+    }
+  }
 
   if (isMobile === undefined) return null
 
@@ -55,35 +78,35 @@ export default function PostCard({ post, liked, onLikeToggle, size = "default", 
   }
 
   const handleSaveEdit = async () => {
-  setLoading(true)
-  try {
-    const requests = []
-    if (newContent !== post.content) {
-      requests.push(
-        api.patch(`/v1/posts/update-content/${post.id}`, null, {
-          params: { content: newContent }
-        })
-      )
+    setLoading(true)
+    try {
+      const requests = []
+      if (newContent !== post.content) {
+        requests.push(
+          api.patch(`/v1/posts/update-content/${post.id}`, null, {
+            params: { content: newContent }
+          })
+        )
+      }
+      if (newPrivacy !== post.privacy) {
+        requests.push(
+          api.patch(`/v1/posts/update-privacy/${post.id}`, null, {
+            params: { privacy: newPrivacy }
+          })
+        )
+      }
+      await Promise.all(requests)
+      toast.success("Cập nhật bài viết thành công!")
+      post.content = newContent
+      post.privacy = newPrivacy
+      setEditing(false)
+    } catch (err) {
+      toast.error("Lỗi khi cập nhật bài viết!")
+      console.error(err)
+    } finally {
+      setLoading(false)
     }
-    if (newPrivacy !== post.privacy) {
-      requests.push(
-        api.patch(`/v1/posts/update-privacy/${post.id}`, null, {
-          params: {privacy: newPrivacy }
-        })
-      )
-    }
-    await Promise.all(requests)
-    toast.success("Cập nhật bài viết thành công!")
-    post.content = newContent
-    post.privacy = newPrivacy
-    setEditing(false)
-  } catch (err) {
-    toast.error("Lỗi khi cập nhật bài viết!")
-    console.error(err)
-  } finally {
-    setLoading(false)
   }
-}
 
   const handleShare = () => {
     toast.success("Bài viết đã được chia sẻ (demo)!")
@@ -183,7 +206,10 @@ export default function PostCard({ post, liked, onLikeToggle, size = "default", 
         <ImageView
           images={post.files}
           isActive={!isModalOpen}
-          onImageClick={(i) => setActiveImageIndex(i)}
+          onImageClick={(i) => {
+            setActiveImageIndex(i)
+            setShowModal(true)
+          }}
         />
       )}
 
@@ -191,7 +217,10 @@ export default function PostCard({ post, liked, onLikeToggle, size = "default", 
         <button onClick={onLikeToggle} className="p-2 rounded-full">
           <Heart className={`h-5 w-5 ${liked ? "fill-red-500 text-red-500" : ""}`} />
         </button>
-        <button onClick={() => setShowModal(true)}><MessageCircle className="h-5 w-5" /></button>
+        <button onClick={() => {
+          setShowModal(true)
+          fetchComments()
+        }}><MessageCircle className="h-5 w-5" /></button>
         <button onClick={handleShare}><SendHorizonal className="h-5 w-5" /></button>
       </div>
 
@@ -204,16 +233,25 @@ export default function PostCard({ post, liked, onLikeToggle, size = "default", 
         </div>
       )}
 
-      <button className={textSizes.viewAll} onClick={() => setShowModal(true)}>
+      <button
+        className={textSizes.viewAll}
+        onClick={() => {
+          setShowModal(true)
+          fetchComments()
+        }}
+      >
         Xem tất cả {post.commentCount} bình luận
       </button>
 
       {isModalOpen && (
         <PostModal
           post={post}
-          liked={post.liked}
+          liked={liked}
           likeCount={post.likeCount}
           activeIndex={activeImageIndex}
+          comments={comments}
+          loadingComments={loadingComments}
+          onFetchComments={fetchComments}
           onClose={() => {
             setActiveImageIndex(null)
             setShowModal(false)

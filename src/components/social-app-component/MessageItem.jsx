@@ -1,3 +1,5 @@
+"use client";
+
 import { useState } from "react";
 import clsx from "clsx";
 import dayjs from "dayjs";
@@ -10,7 +12,7 @@ import Avatar from "../ui-components/Avatar";
 
 dayjs.extend(relativeTime);
 
-// Helper
+// Helper functions
 const getFilenameFromUrl = (url) => {
   if (!url) return 'Unknown file';
   const match = url.match(/\/([^\/]+\.(png|jpg|jpeg|gif|pdf|doc|docx|txt|zip|rar|mp4|mp3|wav|xlsx|ppt|pptx))/i);
@@ -68,7 +70,11 @@ export default function MessageItem({
 
   const isSelf = msg.sender?.id !== targetUser?.id;
   const isSelected = selectedMessage === msg.id;
-  const timeSent = dayjs(msg.createdAt).fromNow();
+  const timeSent = dayjs(msg.sentAt).fromNow();
+  
+  // Check if message is deleted or updated based on API response
+  const isDeleted = msg.deleted === true;
+  const isUpdated = msg.updated === true;
 
   const handlePreviewClick = (url, fileType) => {
     setCurrentFile(url);
@@ -116,7 +122,7 @@ export default function MessageItem({
 
   return (
     <>
-      <div className={clsx("flex items-start gap-2 group", {
+      <div className={clsx("flex items-start gap-2 group message-container", {
         "justify-end": isSelf,
         "justify-start": !isSelf,
       })}>
@@ -136,7 +142,7 @@ export default function MessageItem({
             <div
               className={clsx(
                 "rounded-xl px-3 py-2 text-sm inline-block",
-                msg.deleted
+                isDeleted
                   ? "bg-gray-200 text-gray-500 italic dark:bg-gray-700 dark:text-gray-400"
                   : isSelf
                   ? "bg-blue-500 text-white"
@@ -148,7 +154,7 @@ export default function MessageItem({
                 maxWidth: '100%'
               }}
             >
-              {msg.deleted ? (
+              {isDeleted ? (
                 "Tin nhắn đã bị thu hồi"
               ) : msg.attachment ? (
                 renderFileInfo(
@@ -168,7 +174,7 @@ export default function MessageItem({
               )}
 
               <div className="text-xs mt-1 opacity-70 flex items-center justify-between gap-2">
-                {msg.edited && !msg.deleted && (
+                {isUpdated && !isDeleted && (
                   <span className="flex items-center gap-1">
                     <Edit className="w-3 h-3" />
                     <span>đã chỉnh sửa</span>
@@ -178,7 +184,7 @@ export default function MessageItem({
               </div>
             </div>
 
-            {isSelf && !msg.deleted && (
+            {isSelf && !isDeleted && (
               <div className="relative">
                 <button
                   onClick={() => onMessageClick(msg)}
@@ -188,18 +194,25 @@ export default function MessageItem({
                 </button>
 
                 {isSelected && (
-                  <div className="absolute right-0 top-full mt-1 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-1 z-10 min-w-[100px]">
-                    {!msg.attachedFile && !msg.attachment && (
-                      <button
-                        onClick={() => onEditMessage(msg)}
-                        className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded w-full text-left"
-                      >
-                        <Edit className="w-4 h-4" />
-                        <span>Sửa</span>
-                      </button>
-                    )}
+                  <div
+                    className="absolute right-0 top-full mt-1 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-1 z-10 min-w-[100px]"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <button
-                      onClick={() => onDeleteMessage(msg.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEditMessage(msg);
+                      }}
+                      className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded w-full text-left"
+                    >
+                      <Edit className="w-4 h-4" />
+                      <span>Sửa</span>
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteMessage(msg.id);
+                      }}
                       className="flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded w-full text-left"
                     >
                       <Trash2 className="w-4 h-4" />
