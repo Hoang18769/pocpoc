@@ -45,7 +45,8 @@ export default function NewPostModal({ isOpen, onClose }) {
   };
 
   const handleSubmit = async () => {
-    if (media.length === 0 || !content || !privacy || isLoading) return;
+    // Chỉ cần 1 trong 2: content hoặc media có tồn tại
+    if ((media.length === 0 && !content.trim()) || !privacy || isLoading) return;
 
     setIsLoading(true);
     const formData = new FormData();
@@ -154,6 +155,45 @@ export default function NewPostModal({ isOpen, onClose }) {
                   {isLoading ? "Posting..." : "Post"}
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Hiển thị form caption khi không có media */}
+        {media.length === 0 && (
+          <div className="mt-4 space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Privacy</label>
+              <select
+                value={privacy}
+                onChange={(e) => setPrivacy(e.target.value)}
+                className="w-full px-3 py-2 border rounded-md bg-[var(--input)] text-[var(--foreground)]"
+              >
+                <option value="PUBLIC">🌍 Public</option>
+                <option value="FRIEND">👥 Friends</option>
+                <option value="PRIVATE">🔒 Only me</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">What's on your mind?</label>
+              <textarea
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                rows={4}
+                placeholder="Viết điều gì đó..."
+                className="w-full px-3 py-2 border rounded-md bg-[var(--input)] text-[var(--foreground)] resize-none"
+              />
+            </div>
+
+            <div className="flex justify-end">
+              <button
+                onClick={handleSubmit}
+                disabled={isLoading || (!content.trim() && media.length === 0)}
+                className="px-4 py-2 rounded-md bg-[var(--primary)] text-white hover:bg-opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isLoading ? "Posting..." : "Post"}
+              </button>
             </div>
           </div>
         )}

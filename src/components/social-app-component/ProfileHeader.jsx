@@ -9,14 +9,21 @@ import toast from "react-hot-toast";
 import { useParams, useRouter } from "next/navigation";
 import useAppStore from "@/store/ZustandStore";
 
+import FriendsListModal from "./FriendsListModal";
+
 export default function ProfileHeader({ 
   profileData, 
   isOwnProfile = true, 
-  activeTab = "posts", // Nhận activeTab từ parent
-  onTabChange, // Nhận callback để thay đổi tab
+  activeTab = "posts",
+  onTabChange,
   onProfileUpdate 
 }) {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isFriendsModalOpen, setIsFriendsModalOpen] = useState(false);
+  const [friendsList, setFriendsList] = useState([]);
+  const [isLoadingFriends, setIsLoadingFriends] = useState(false);
+  const [initialModalTab, setInitialModalTab] = useState("friends"); // Thêm state để xác định tab mở đầu
+  
   const avatar = profileData.profilePictureUrl;
   const { username: routeUsername } = useParams();
   const router = useRouter();
@@ -49,50 +56,47 @@ export default function ProfileHeader({
     setIsEditModalOpen(false);
   };
 
-const handleChatClick = () => {
-  const targetUserId = profileData.id;
-  const targetUsername = profileData.username;
+  const handleChatClick = () => {
+    const targetUserId = profileData.id;
+    const targetUsername = profileData.username;
 
-  console.log("🔍 handleChatClick:", { targetUserId, targetUsername });
+    console.log("🔍 handleChatClick:", { targetUserId, targetUsername });
 
-  if (!targetUserId) {
-    toast.error("Không thể tìm thấy thông tin người dùng");
-    return;
-  }
+    if (!targetUserId) {
+      toast.error("Không thể tìm thấy thông tin người dùng");
+      return;
+    }
 
-  // ✅ Tìm chat theo cả userId và username (khớp với cấu trúc store)
-  const existingChat = chatList.find(chat => {
-    return chat.target?.id === targetUserId || 
-           chat.target?.username === targetUsername;
-  });
+    const existingChat = chatList.find(chat => {
+      return chat.target?.id === targetUserId || 
+             chat.target?.username === targetUsername;
+    });
 
-  console.log("🎯 Existing chat found:", existingChat);
+    console.log("🎯 Existing chat found:", existingChat);
 
-  if (existingChat) {
-    // ✅ Sử dụng đúng field name từ store
-    const chatId = existingChat.chatId;
-    console.log("✅ Selecting existing chat:", chatId);
-    
-    selectChat(chatId); // ✅ Chỉ truyền chatId, không cần target
+    if (existingChat) {
+      const chatId = existingChat.chatId;
+      console.log("✅ Selecting existing chat:", chatId);
+      
+      selectChat(chatId);
+      
+      router.push('/chats');
+      return;
+    }
+
+    const virtualChatData = {
+      username: profileData.username,
+      givenName: profileData.givenName,
+      familyName: profileData.familyName,
+      profilePictureUrl: profileData.profilePictureUrl,
+      online: profileData.online || false
+    };
+
+    console.log("🆕 Creating virtual chat:", virtualChatData);
+    showVirtualChat(targetUserId, virtualChatData);
     
     router.push('/chats');
-    return;
-  }
-
-  // ✅ Tạo virtual chat với đúng structure
-  const virtualChatData = {
-    username: profileData.username,
-    givenName: profileData.givenName,
-    familyName: profileData.familyName,
-    profilePictureUrl: profileData.profilePictureUrl,
-    online: profileData.online || false
   };
-
-  console.log("🆕 Creating virtual chat:", virtualChatData);
-  showVirtualChat(targetUserId, virtualChatData);
-  
-  router.push('/chats');
-};
 
   const cancelFriendRequest = async () => {
     try {
@@ -157,6 +161,67 @@ const handleChatClick = () => {
     }
   };
 
+  const handleGetListFriend = async () => {
+    // Nếu không có bạn bè thì không cần gọi API
+    if (profileData.friendCount === 0) {
+      setFriendsList([]);
+      setInitialModalTab("friends"); // Set tab mặc định là friends
+      setIsFriendsModalOpen(true);
+      return;
+    }
+
+    setIsLoadingFriends(true);
+    try {
+      const res = await api.get(`/v1/friends/${username}`);
+      
+      if (res.data.code === 200) {
+        // Lấy danh sách bạn bè từ res.data.body
+        const friends = res.data.body || [];
+        setFriendsList(friends);
+        setInitialModalTab("friends"); // Set tab mặc định là friends
+        setIsFriendsModalOpen(true);
+      } else {
+        toast.error("Không thể tải danh sách bạn bè");
+      }
+    } catch (error) {
+      console.error("Lỗi khi lấy danh sách bạn bè:", error);
+      toast.error("Có lỗi xảy ra, vui lòng thử lại sau");
+    } finally {
+      setIsLoadingFriends(false);
+    }
+  };
+
+  // Handler riêng cho nút "Bạn chung"
+  const handleGetMutualFriends = async () => {
+    // Nếu không có bạn chung thì vẫn mở modal nhưng sẽ hiển thị empty state
+    if (profileData.mutualFriendCount === 0) {
+      setFriendsList([]); // Clear danh sách bạn bè cũ
+      setInitialModalTab("mutual"); // Set tab mặc định là mutual
+      setIsFriendsModalOpen(true);
+      return;
+    }
+
+    setIsLoadingFriends(true);
+    try {
+      // Lấy danh sách bạn bè trước (nếu chưa có)
+      const friendsRes = await api.get(`/v1/friends/${username}`);
+      
+      if (friendsRes.data.code === 200) {
+        const friends = friendsRes.data.body || [];
+        setFriendsList(friends);
+        setInitialModalTab("mutual"); // Set tab mặc định là mutual
+        setIsFriendsModalOpen(true);
+      } else {
+        toast.error("Không thể tải danh sách bạn bè");
+      }
+    } catch (error) {
+      console.error("Lỗi khi lấy danh sách bạn bè:", error);
+      toast.error("Có lỗi xảy ra, vui lòng thử lại sau");
+    } finally {
+      setIsLoadingFriends(false);
+    }
+  };
+
   const renderFriendButton = () => {
     if (profileData.isFriend) {
       return (
@@ -209,7 +274,6 @@ const handleChatClick = () => {
     );
   };
 
-  // Hàm xử lý khi người dùng click vào tab
   const handleTabClick = (tabName) => {
     if (onTabChange) {
       onTabChange(tabName);
@@ -265,9 +329,22 @@ const handleChatClick = () => {
             <span>
               <strong>0</strong> Bài viết
             </span>
-            <span>
+            <button 
+              onClick={handleGetListFriend}
+              disabled={isLoadingFriends}
+              className="hover:text-blue-600 transition-colors disabled:opacity-50"
+            >
               <strong>{profileData?.friendCount || 0}</strong> Bạn bè
-            </span>
+              {isLoadingFriends && <span className="ml-1">...</span>}
+            </button>
+            <button 
+              onClick={handleGetMutualFriends} // Sử dụng handler riêng cho bạn chung
+              disabled={isLoadingFriends}
+              className="hover:text-blue-600 transition-colors disabled:opacity-50"
+            >
+              <strong>{profileData?.mutualFriendCount || 0}</strong> Bạn chung
+              {isLoadingFriends && <span className="ml-1">...</span>}
+            </button>
           </div>
 
           <p className="text-sm mt-2 text-gray-700">
@@ -276,7 +353,7 @@ const handleChatClick = () => {
         </div>
       </div>
 
-      {/* Tab Navigation - Sử dụng activeTab từ props và gọi onTabChange */}
+      {/* Tab Navigation */}
       <div className="flex justify-around text-sm border-t mt-4 pt-2">
         <button
           className={`flex items-center gap-1 ${
@@ -303,8 +380,22 @@ const handleChatClick = () => {
         </button>
       </div>
 
+      {/* Modal chỉnh sửa profile */}
       <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)}>
         <EditProfileModal profileData={profileData} onSave={handleSaveProfile} />
+      </Modal>
+
+      {/* Modal danh sách bạn bè */}
+      <Modal 
+        isOpen={isFriendsModalOpen} 
+        onClose={() => setIsFriendsModalOpen(false)}
+        size="small"
+      >
+        <FriendsListModal 
+          username={username}
+          initialFriends={friendsList}
+          initialTab={initialModalTab} // Truyền tab mặc định
+        />
       </Modal>
     </div>
   );

@@ -6,13 +6,13 @@ import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import "dayjs/locale/vi";
 
-// Kích hoạt plugin và đặt ngôn ngữ
 dayjs.extend(relativeTime);
 dayjs.locale("vi");
 
 export default function ChatItem({ chat, onClick, selected }) {
   const { chatId, latestMessage, target, notReadMessageCount } = chat;
   const isOnline = target?.online;
+  const isUnread = notReadMessageCount > 0;
 
   const displayName = `${target?.givenName || ""} ${target?.familyName || ""}`;
 
@@ -20,14 +20,12 @@ export default function ChatItem({ chat, onClick, selected }) {
   let sentTime = "";
 
   if (latestMessage) {
-    const senderPrefix =
-      latestMessage.sender?.id === target?.id ? "" : "Bạn: ";
-    content =
-      latestMessage.attachment
-        ? "[Tệp đính kèm]"
-        : latestMessage.content?.slice(0, 60) || "Tin nhắn đã bị xoá";
+    const senderPrefix = latestMessage.sender?.id === target?.id ? "" : "Bạn: ";
+    content = latestMessage.attachment
+      ? "[Tệp đính kèm]"
+      : latestMessage.content?.slice(0, 60) || "Tin nhắn đã bị xoá";
+    content = latestMessage.deleted ? "Tin nhắn đã bị thu hồi" : senderPrefix + content;
     sentTime = dayjs(latestMessage.sentAt).fromNow();
-    content = senderPrefix + content;
   }
 
   return (
@@ -38,26 +36,48 @@ export default function ChatItem({ chat, onClick, selected }) {
       }`}
       data-chat-id={chatId}
     >
+      {/* Avatar */}
       <div className="relative">
         <Avatar src={target?.profilePictureUrl} alt={displayName} />
         {isOnline && (
           <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-background rounded-full" />
         )}
+        {/* Badge overlay on avatar for small screens */}
+        {notReadMessageCount > 0 && (
+          <div className="absolute -top-1 -right-1 block md:hidden">
+            <Badge variant="secondary" className="rounded-full px-1.5 text-[10px] border">
+              {notReadMessageCount}
+            </Badge>
+          </div>
+        )}
       </div>
 
-      <div className="flex-1 min-w-0">
+      {/* Chat info - show below 630px and above 768px, hide in between */}
+      <div className="flex-1 min-w-0 flex flex-col hide-between-630-768">
         <div className="flex justify-between items-center mb-0.5">
-          <p className="font-medium truncate">{displayName}</p>
+          <p className={`truncate ${isUnread ? "font-bold" : "font-medium"}`}>
+            {displayName}
+          </p>
           {sentTime && (
-            <span className="text-xs text-muted-foreground shrink-0">
+            <span
+              className={`text-xs text-muted-foreground shrink-0 ${
+                isUnread ? "font-bold" : ""
+              }`}
+            >
               {sentTime}
             </span>
           )}
         </div>
         <div className="flex justify-between items-center">
-          <p className="text-sm text-muted-foreground truncate">{content}</p>
+          <p
+            className={`text-sm text-muted-foreground truncate ${
+              isUnread ? "font-bold" : ""
+            }`}
+          >
+            {content}
+          </p>
           {notReadMessageCount > 0 && (
-            <Badge variant="secondary" className="text-xs ml-2">
+            <Badge variant="secondary" className="rounded-full border px-2 text-xs ml-2">
               {notReadMessageCount}
             </Badge>
           )}

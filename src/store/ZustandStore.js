@@ -35,14 +35,17 @@ const useAppStore = create(
           if (otherUser) conversationMap.set(otherUser.id, chat.id);
         });
 
+        // ✅ Reverse the chat list when fetching
+        const reversedData = [...data].reverse();
+
         set({ 
-          chatList: data, 
+          chatList: reversedData, 
           conversationMap,
           isLoadingChats: false,
           error: null
         });
 
-        console.log(`📊 ${STORE_EVENTS.CHAT_LIST_LOAD} - ${data.length} chats`);
+        console.log(`📊 ${STORE_EVENTS.CHAT_LIST_LOAD}`,reversedData);
       } catch (error) {
         console.error('❌ Error fetching chats:', error);
         set({ 
@@ -51,7 +54,16 @@ const useAppStore = create(
         });
       }
     },
-
+// Trong store
+updateChatListAfterMessage: (chatId, lastMessage) => {
+  set((state) => ({
+    chatList: state.chatList.map(chat => 
+      chat.id === chatId 
+        ? { ...chat, lastMessage, updatedAt: new Date().toISOString() }
+        : chat
+    ).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
+  }));
+},
     getUserByChatId: (chatId) => {
       const chat = get().chatList.find(c => c.id === chatId);
       return chat ? chat.user : null;
@@ -68,8 +80,8 @@ const useAppStore = create(
     },
 
     onMessageReceived: (message, isCurrentChatOpen = false) => {
-      set(state => ({
-        chatList: state.chatList
+      set(state => {
+        const updatedChats = state.chatList
           .map(chat => {
             if (chat.chatId === message.chatId || chat.id === message.chatId) {
               return { 
@@ -83,10 +95,12 @@ const useAppStore = create(
             }
             return chat;
           })
-          .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
-      }));
+          .sort((a, b) => new Date(a.updatedAt) - new Date(b.updatedAt)); // ✅ Sort ascending (oldest first)
 
-      console.log(`📊 ${STORE_EVENTS.MESSAGE_RECEIVED} - ${message.chatId}`);
+        return { chatList: updatedChats };
+      });
+
+      console.log(`📊 ${STORE_EVENTS.MESSAGE_RECEIVED} - ${message.chatId} (maintaining reverse order)`);
     },
 
     onChatCreated: (newChat) => {
@@ -94,13 +108,14 @@ const useAppStore = create(
       const otherUser = newChat.participants?.find(p => p.id !== currentUserId);
 
       set(state => ({
-        chatList: [newChat, ...state.chatList],
+        // ✅ Add new chat at the end (to maintain reverse chronological order)
+        chatList: [...state.chatList, newChat],
         conversationMap: otherUser 
           ? new Map(state.conversationMap).set(otherUser.id, newChat.id)
           : state.conversationMap
       }));
 
-      console.log(`📊 ${STORE_EVENTS.CHAT_CREATED} - ${newChat.id}`);
+      console.log(`📊 ${STORE_EVENTS.CHAT_CREATED} - ${newChat.id} (added to end)`);
     },
 
     // ============ NOTIFICATIONS STATE ============
@@ -135,28 +150,40 @@ const useAppStore = create(
         
         if (responseData) {
           // Kiểm tra các cấu trúc response khác nhau
-          if (responseData.content && Array.isArray(responseData.content)) {
-            data = responseData.content; // Paginated response
-          } else if (responseData.body && Array.isArray(responseData.body)) {
+         if (responseData.body && Array.isArray(responseData.body)) {
             data = responseData.body; // Body response
           } else if (Array.isArray(responseData)) {
             data = responseData; // Direct array
-          } else if (responseData.data && Array.isArray(responseData.data)) {
-            data = responseData.data; // Nested data
           }
         }
         
-        const unreadCount = data.filter(notification => !notification.isRead).length;
+        // ✅ FIX: Chỉ tính count khi không có notifications từ socket
+        const currentNotifications = get().notifications;
+        let finalNotifications = data;
+        let unreadCount = 0;
+        
+        if (currentNotifications.length > 0) {
+          // ✅ Merge notifications từ API với notifications từ socket
+          // Tránh duplicate bằng cách filter theo ID
+          const apiNotificationIds = new Set(data.map(n => n.id));
+          const socketOnlyNotifications = currentNotifications.filter(n => !apiNotificationIds.has(n.id));
+          
+          finalNotifications = [...socketOnlyNotifications, ...data];
+          unreadCount = finalNotifications.filter(n => !n.isRead).length;
+        } else {
+          // ✅ Chỉ có notifications từ API
+          unreadCount = data.filter(n => !n.isRead).length;
+        }
         
         set({ 
-          notifications: data,
+          notifications: finalNotifications,
           unreadNotificationCount: unreadCount,
           isLoadingNotifications: false,
           error: null
         });
 
-        console.log(`📊 ${STORE_EVENTS.NOTIFICATIONS_LOAD} - ${data.length} notifications, ${unreadCount} unread`);
-        return data;
+        console.log(`📊 ${STORE_EVENTS.NOTIFICATIONS_LOAD} - ${finalNotifications.length} notifications, ${unreadCount} unread`);
+        return finalNotifications;
       } catch (error) {
         console.error('❌ Error fetching notifications:', error);
         set({ 
@@ -170,26 +197,27 @@ const useAppStore = create(
     onNotificationReceived: (notification) => {
       const { notifications } = get();
       
-      // Nếu danh sách thông báo rỗng, fetch từ API để đảm bảo có đầy đủ data
+      // ✅ FIX: Nếu danh sách rỗng, fetch song song nhưng vẫn xử lý notification từ socket
       if (notifications.length === 0) {
         console.log('📊 Empty notifications list, fetching from API...');
-        get().fetchNotifications(true); // Force fetch
-        return;
+        // Fetch song song, không return
+        get().fetchNotifications(true);
+        // Tiếp tục xử lý notification từ socket
       }
 
-      // Kiểm tra xem thông báo đã tồn tại chưa (tránh duplicate)
+      // ✅ Kiểm tra xem thông báo đã tồn tại chưa (tránh duplicate)
       const existingNotification = notifications.find(n => n.id === notification.id);
       if (existingNotification) {
         console.log(`📊 Notification ${notification.id} already exists, skipping...`);
         return;
       }
 
-      // Thêm thông báo mới vào đầu danh sách
+      // ✅ Chỉ tăng count nếu notification chưa đọc
       set(state => ({
         notifications: [notification, ...state.notifications],
-        unreadNotificationCount: notification.isRead 
-          ? state.unreadNotificationCount 
-          : state.unreadNotificationCount + 1
+        unreadNotificationCount: !notification.isRead 
+          ? state.unreadNotificationCount + 1
+          : state.unreadNotificationCount
       }));
 
       console.log(`📊 ${STORE_EVENTS.NOTIFICATION_RECEIVED} - ${notification.id || 'new notification'}`);
@@ -197,12 +225,19 @@ const useAppStore = create(
 
     markNotificationAsRead: async (notificationId) => {
       try {
+        // ✅ Kiểm tra notification có tồn tại và chưa đọc không
+        const { notifications } = get();
+        const notification = notifications.find(n => n.id === notificationId);
+        
+        if (!notification || notification.isRead) {
+          return; // Không cần update count
+        }
         
         set(state => ({
-          notifications: state.notifications.map(notification =>
-            notification.id === notificationId
-              ? { ...notification, isRead: true }
-              : notification
+          notifications: state.notifications.map(n =>
+            n.id === notificationId
+              ? { ...n, isRead: true }
+              : n
           ),
           unreadNotificationCount: Math.max(0, state.unreadNotificationCount - 1)
         }));
@@ -220,7 +255,7 @@ const useAppStore = create(
           notifications: state.notifications.map(notification =>
             ({ ...notification, isRead: true })
           ),
-          unreadNotificationCount: 0
+          unreadNotificationCount: 0 // ✅ Reset về 0
         }));
       } catch (error) {
         console.error('❌ Error marking all notifications as read:', error);
@@ -253,6 +288,15 @@ const useAppStore = create(
       } catch (error) {
         console.error('❌ Error clearing all notifications:', error);
       }
+    },
+
+    // ✅ Thêm method để sync count từ notifications array
+    syncUnreadCount: () => {
+      const { notifications } = get();
+      const unreadCount = notifications.filter(n => !n.isRead).length;
+      
+      set({ unreadNotificationCount: unreadCount });
+      console.log(`📊 Synced unread count: ${unreadCount}`);
     },
 
     // ============ CHAT NAVIGATION & SELECTION LOGIC ============
@@ -353,18 +397,19 @@ const useAppStore = create(
 
     // ============ UTILITY ============
     clearAllData: () => {
-      set({
-        chatList: [],
-        conversationMap: new Map(),
-        selectedChatId: null,
-        virtualChatUser: null,
-        notifications: [],
-        unreadNotificationCount: 0,
-        error: null,
-        isLoadingChats: false,
-        isLoadingNotifications: false
-      });
-    },
+  set({
+    chatList: [],
+    conversationMap: new Map(),
+    selectedChatId: null,
+    virtualChatUser: null,
+    notifications: [],
+    unreadNotificationCount: 0,
+    error: null,
+    isLoadingChats: false,
+    isLoadingNotifications: false,
+  }, true); // 👈 Thêm `true` để notify devtools nếu đang dùng devtools middleware
+},
+
 
     getChatByUserId: (userId) => get().conversationMap.get(userId),
     getSelectedChat: () => {

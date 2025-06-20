@@ -3,7 +3,12 @@
 import { X } from "lucide-react"
 import React, { useEffect } from "react"
 
-export default function Modal({ isOpen, onClose, children }) {
+export default function Modal({ 
+  isOpen, 
+  onClose, 
+  children, 
+  size = "large" // "small", "medium", "large"
+}) {
   // ESC để đóng modal
   useEffect(() => {
     const handleEsc = (e) => {
@@ -20,6 +25,19 @@ export default function Modal({ isOpen, onClose, children }) {
       document.body.style.overflow = "" // ✅ Khôi phục khi đóng modal
     }
   }, [isOpen, onClose])
+
+  // Hàm lấy class width theo size
+  const getWidthClass = () => {
+    switch (size) {
+      case "small":
+        return "w-full max-w-md" // ~448px
+      case "medium":
+        return "w-full max-w-2xl" // ~672px
+      case "large":
+      default:
+        return "w-full max-w-5xl" // ~1024px
+    }
+  }
 
   if (!isOpen) return null
 
@@ -46,7 +64,7 @@ export default function Modal({ isOpen, onClose, children }) {
 
       {/* Nội dung modal */}
       <div
-        className="relative z-10 w-full max-w-5xl h-[90vh] md:h-[90vh] rounded-xl bg-[var(--card)] text-[var(--card-foreground)] shadow-xl overflow-hidden pointer-events-auto"
+        className={`relative z-10 ${getWidthClass()} h-[90vh] md:h-[90vh] rounded-xl bg-[var(--card)] text-[var(--card-foreground)] shadow-xl overflow-hidden pointer-events-auto`}
         onClick={(e) => e.stopPropagation()} // ⛔ Chặn lan click
       >
         {children}

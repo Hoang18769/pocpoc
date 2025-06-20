@@ -149,24 +149,19 @@ export default function ExplorerPage() {
                   onClick={() => goToProfile(user.username)}
                 >
                   <div className="flex items-center gap-3">
-                    <Avatar
-                      src={user.avatar || user.profilePictureUrl}
-                      alt={user.username}
-                      width={40}
-                      height={40}
-                      className="w-10 h-10 rounded-full"
-                    />
-                    <span className="font-medium">{user.username}</span>
+                    <UserHeader
+  user={{
+    familyName: user.familyName,
+    givenName: user.givenName,
+    profilePictureUrl: user.avatar || user.profilePictureUrl,
+    lastOnline: user.isOnline ? "Online" : user.lastOnline,
+  }}
+  showOptions={false}
+  className="p-0"
+/>
+
                   </div>
-                  <button
-                    className="text-sm text-blue-500 hover:underline"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      // TODO: xử lý theo dõi
-                    }}
-                  >
-                    Theo dõi
-                  </button>
+                  
                 </li>
               ))
             )}

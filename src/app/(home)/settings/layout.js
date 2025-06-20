@@ -15,7 +15,6 @@ const groupedMenuItems = [
     items: [
       { id: "personalinfo", icon: UserCircle, label: "Thông tin cá nhân" },
       { id: "privacy", icon: Lock, label: "Bảo mật & Quyền riêng tư" },
-      { id: "restrictedaccounts", icon: ShieldCheck, label: "Tài khoản bị hạn chế" },
     ]
   },
   {
@@ -23,22 +22,14 @@ const groupedMenuItems = [
     items: [
       // { id: "connections", icon: Users, label: "Bạn bè & Kết nối" },
       { id: "blockedlist", icon: Ban, label: "Danh sách chặn" },
-      { id: "sentreports", icon: Flag, label: "Báo cáo đã gửi" },
     ]
   },
+  
   {
-    title: "Nội dung",
-    items: [
-      { id: "savedposts", icon: FileText, label: "Bài viết & Bình luận đã lưu" },
-      { id: "uploadedfiles", icon: Database, label: "Tệp đã tải lên" },
-    ]
-  },
-  {
-    title: "Tin nhắn & Thông báo",
+    title: "Ngôn ngữ và hiển thị",
     items: [
       { id: "Messages", icon: MessageCircle, label: "Tin nhắn" },
       { id: "GroupChatActivity", icon: MessageSquare, label: "Hoạt động Chat nhóm" },
-      { id: "Notifications", icon: Mail, label: "Thông báo hệ thống" },
     ]
   }
 ];

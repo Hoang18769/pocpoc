@@ -10,12 +10,14 @@ import axios from "axios";
 import api, { clearSession } from "@/utils/axios";
 import NewPostModal from "../social-app-component/CreatePostForm";
 import NotificationList from "../social-app-component/NotificationList";
+import useAppStore from "@/store/ZustandStore";
 
 export default function Header({ className = "" }) {
   const router = useRouter();
   const [showPostModal, setShowPostModal] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const notificationRef = useRef(null);
+  const clearAllData = useAppStore(state => state.clearAllData);
 
   // Đóng notification khi click ra ngoài
   useEffect(() => {
@@ -42,6 +44,8 @@ export default function Header({ className = "" }) {
     console.error("Logout failed:", err.response?.data || err.message);
   } finally {
     clearSession(); // ✅ xoá localStorage + cookie + token headers
+    clearAllData();
+
     router.push("/register");
   }
 };
@@ -63,7 +67,7 @@ export default function Header({ className = "" }) {
         </div>
 
         <div className="flex justify-end space-x-2 items-center relative">
-          <ThemeToggle />
+          
 
           <button
             type="button"
@@ -83,19 +87,14 @@ export default function Header({ className = "" }) {
     <NotificationList />
   </div>
 )}
-          <button
-            type="button"
-            aria-label="Search"
-            className="w-12 h-12 bg-[var(--card)] rounded-full flex items-center justify-center hover:bg-gray-300 dark:hover:bg-gray-700 transition"
-          >
-            <Search size={20} className="text-[var(--foreground)]" />
-          </button>
+          
 
           <div
             role="group"
             aria-label="Add and Messages"
             className="h-12 bg-[var(--card)] rounded-full flex items-center"
           >
+          
             <button
               type="button"
               aria-label="Add"
@@ -107,13 +106,7 @@ export default function Header({ className = "" }) {
 
             <div className="h-6 w-px bg-gray-300 dark:bg-gray-700"></div>
 
-            <button
-              type="button"
-              aria-label="Messages"
-              className="w-12 h-12 flex items-center justify-center hover:bg-gray-300 dark:hover:bg-gray-700 transition rounded-r-full"
-            >
-              <MessageCircle size={20} className="text-[var(--foreground)]" />
-            </button>
+           <ThemeToggle />
           </div>
 
           <button

@@ -12,14 +12,13 @@ export default function ChatHeader({
 }) {
   return (
     <div className="flex items-center gap-3 p-3 py-1 border-b border-[var(--border)]">
-      {onBack && showBackButton && (
         <button
           onClick={onBack}
           className="text-[var(--muted-foreground)] hover:text-foreground"
         >
           <ArrowLeft className="w-3 h-3" />
         </button>
-      )}
+      
       
       <Avatar src={targetUser?.profilePictureUrl} size="sm" />
       

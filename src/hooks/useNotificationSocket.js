@@ -7,14 +7,14 @@ import useAppStore from "@/store/ZustandStore";
 export default function useNotificationSocket(userId) {
   const subscriptionRef = useRef(null);
   const clientRef = useRef(null);
-  
-  // Get store methods
-  const { 
-    fetchChatList, 
+
+  // Store actions
+  const {
+    fetchChatList,
     onMessageReceived,
     onChatCreated,
-    // fetchNotifications, // Uncomment khi implement notifications
-    // onNotificationReceived // Uncomment khi implement notifications
+    fetchNotifications,
+    onNotificationReceived,
   } = useAppStore();
 
   useEffect(() => {
@@ -28,89 +28,112 @@ export default function useNotificationSocket(userId) {
       }
 
       const name = data.creator?.givenName || "ai đó";
-      
-      // Handle different notification types and trigger store updates
+
+      // === Toast & store updates by action ===
       switch (data.action) {
         case "SENT_ADD_FRIEND_REQUEST":
           toast(`${name} đã gửi lời mời kết bạn 💌`);
-          // Trigger fetch notifications if implemented
-          // fetchNotifications && fetchNotifications();
           break;
-          
+
         case "BE_FRIEND":
         case "ACCEPTED_FRIEND_REQUEST":
           toast(`${name} đã trở thành bạn bè 👥`);
-          // Trigger fetch notifications if implemented
-          // fetchNotifications && fetchNotifications();
           break;
-          
+
         case "POST":
           toast(`${name} đã đăng một bài viết mới`);
-          // Trigger newsfeed refresh if implemented
-          // fetchNewsFeed && fetchNewsFeed();
           break;
-          
+
         case "SHARE":
           toast(`${name} đã chia sẻ một bài viết mới`);
-          // Trigger newsfeed refresh if implemented
-          // fetchNewsFeed && fetchNewsFeed();
           break;
-          
+
         case "LIKE_POST":
           toast(`${name} đã thích bài viết của bạn ❤️`);
-          // Update specific post if implemented
           break;
-          
+
         case "COMMENT":
-          toast(`${name} đã bình luận về bài viết của bạn`);
-          // Update specific post if implemented
+          toast(`${name} đã bình luận về bài viết của bạn 💬`);
           break;
-          
+
         case "REPLY_COMMENT":
-          toast(`${name} đã trả lời bình luận`);
-          // Update specific post if implemented
+          toast(`${name} đã trả lời bình luận của bạn 💬`);
           break;
-          
-        case "NEW_MESSAGE":
-          toast(`${name} đã nhắn tin cho bạn 💬`);
-          
-          // **KEY UPDATE**: Refresh chat list when new message arrives
-          try {
-            // Option 1: Full refresh chat list
-            await fetchChatList();
-            
-            // Option 2: If you have message data, update specific chat
-            if (data.message) {
-              onMessageReceived(data.message);
-            }
-            
-            console.log("✅ Chat list updated after new message notification");
-          } catch (error) {
-            console.error("❌ Failed to update chat list:", error);
-          }
-          break;
-          
+
+       case "NEW_MESSAGE": {
+  toast(`${name} đã nhắn tin cho bạn 💬`);
+  try {
+    if (!data.message || !data.message.senderUsername) break;
+
+    const senderUsername = data.message.senderUsername;
+
+    // Truy xuất chatList từ store
+    const { chatList } = useAppStore.getState();
+
+    const foundChat = chatList.find(
+      (chat) => chat.target?.username === senderUsername
+    );
+
+    if (foundChat) {
+      const updatedChat = {
+        ...foundChat,
+        lastMessage: {
+          ...foundChat.lastMessage,
+          body: data.message.body,
+        },
+        updatedAt: data.message.createdAt || new Date().toISOString(),
+        notReadMessageCount: (foundChat.notReadMessageCount || 0) + 1,
+      };
+
+      // Tạo chatList mới: chat này đứng đầu, còn lại giữ nguyên nhưng sắp theo updatedAt
+      const newChatList = [
+        updatedChat,
+        ...chatList
+          .filter((chat) => chat.id !== foundChat.id)
+          .sort((a, b) => new Date(a.updatedAt) - new Date(b.updatedAt)),
+      ];
+
+      useAppStore.setState({ chatList: newChatList });
+
+      console.log("📥 Cập nhật chatList với NEW_MESSAGE từ", senderUsername);
+    } else {
+      console.log("🔍 Không tìm thấy chat với", senderUsername, "- giữ nguyên danh sách.");
+    }
+
+    // Optionally gọi lại onMessageReceived để cập nhật nếu bạn vẫn muốn
+    useAppStore.getState().onMessageReceived(data.message);
+  } catch (err) {
+    console.error("❌ Failed to process NEW_MESSAGE:", err);
+  }
+
+  break;
+}
+
+
         case "NEW_CHAT_CREATED":
-          // Handle new chat creation
           if (data.chat) {
             onChatCreated(data.chat);
             toast(`${name} đã tạo cuộc trò chuyện mới 💬`);
           }
           break;
-          
+
         default:
           toast(`🔔 Có thông báo mới từ ${name}`);
-          // General notification - fetch notifications list
-          // fetchNotifications && fetchNotifications();
       }
-      
-      // Add notification to store if implemented
-      // if (onNotificationReceived) {
-      //   onNotificationReceived(data);
-      // }
+
+      // ✅ Đồng bộ thông báo vào store
+      if (onNotificationReceived && fetchNotifications) {
+        onNotificationReceived(data); // Tạm thời hiển thị ngay
+
+        // Sync lại từ server để đảm bảo không thiếu
+        // setTimeout(() => {
+        //   fetchNotifications(true);
+        // }, 300);
+        //  // delay nhẹ tránh spam call nếu nhận liên tục
+      }
     };
 
-    // Khởi tạo client với callback onConnect
+    // === Setup socket client ===
     const client = createStompClient((frame) => {
       if (!isMounted) return;
 
@@ -135,7 +158,6 @@ export default function useNotificationSocket(userId) {
 
     clientRef.current = client;
 
-    // Kích hoạt kết nối
     try {
       client.activate();
     } catch (err) {
@@ -145,7 +167,6 @@ export default function useNotificationSocket(userId) {
     return () => {
       isMounted = false;
 
-      // Cleanup subscription
       if (subscriptionRef.current) {
         try {
           subscriptionRef.current.unsubscribe();
@@ -156,7 +177,6 @@ export default function useNotificationSocket(userId) {
         subscriptionRef.current = null;
       }
 
-      // Cleanup client
       if (clientRef.current) {
         try {
           clientRef.current.deactivate();
@@ -167,5 +187,5 @@ export default function useNotificationSocket(userId) {
         clientRef.current = null;
       }
     };
-  }, [userId, fetchChatList, onMessageReceived, onChatCreated]);
+  }, [userId, fetchChatList, onMessageReceived, onChatCreated, fetchNotifications, onNotificationReceived]);
 }

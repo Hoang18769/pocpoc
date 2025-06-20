@@ -37,7 +37,7 @@ const variants = {
 const isVideo = (url = "") => /\.(mp4|webm|ogg)$/i.test(url)
 
 // Component for Comment Actions
-const CommentActions = ({ comment, onLike, onReply, onToggleReplies, showReplies }) => (
+const CommentActions = ({ comment, onLike, onReply, onToggleReplies, showReplies, onDelete, isOwnComment }) => (
   <div className="flex items-center gap-4 text-xs text-[var(--muted-foreground)]">
     <button 
       className="hover:underline flex items-center gap-1 transition-colors"
@@ -49,7 +49,7 @@ const CommentActions = ({ comment, onLike, onReply, onToggleReplies, showReplies
       />
       {comment.likeCount}
     </button>
-    
+
     <button 
       className="hover:underline flex items-center gap-1"
       onClick={() => onReply(comment.id)}
@@ -67,8 +67,18 @@ const CommentActions = ({ comment, onLike, onReply, onToggleReplies, showReplies
         {comment.replyCount} phản hồi
       </button>
     )}
+
+    {isOwnComment && (
+      <button 
+        className="hover:underline text-red-500"
+        onClick={() => onDelete(comment.id)}
+      >
+        Xóa
+      </button>
+    )}
   </div>
 )
+
 
 // Component for Media Display
 const MediaDisplay = ({ url, alt, className }) => (
@@ -115,6 +125,8 @@ const ReplyForm = ({
     setFile(null)
     setPreviewUrl(null)
   }
+
+
 
   return (
     <div className="mt-3 pl-4 border-l-2 border-[var(--border)]">
@@ -183,6 +195,8 @@ export default function PostModal({
   onCommentUpdate,
 }) {
   const media = post?.files || post?.images || []
+  const hasMedia = Array.isArray(media) && media.length > 0
+  
   const [page, setPage] = useState({ index: activeIndex, direction: 0 })
   const [touchStartX, setTouchStartX] = useState(null)
   
@@ -212,13 +226,13 @@ export default function PostModal({
 
   // Navigation functions
   const showNext = () => {
-    if (page.index < media.length - 1) {
+    if (hasMedia && page.index < media.length - 1) {
       setPage({ index: page.index + 1, direction: 1 })
     }
   }
 
   const showPrev = () => {
-    if (page.index > 0) {
+    if (hasMedia && page.index > 0) {
       setPage({ index: page.index - 1, direction: -1 })
     }
   }
@@ -226,7 +240,7 @@ export default function PostModal({
   // Touch handlers
   const handleTouchStart = (e) => setTouchStartX(e.touches[0].clientX)
   const handleTouchEnd = (e) => {
-    if (touchStartX === null) return
+    if (touchStartX === null || !hasMedia) return
     const deltaX = e.changedTouches[0].clientX - touchStartX
     if (deltaX > 50) showPrev()
     else if (deltaX < -50) showNext()
@@ -376,7 +390,7 @@ export default function PostModal({
         setLoadingReplies(prev => ({ ...prev, [commentId]: true }))
         try {
           const res = await api.get(`/v1/comments/of-comment/${commentId}`)
-          setRepliesData(prev => ({ ...prev, [commentId]: res.data }))
+          setRepliesData(prev => ({ ...prev, [commentId]: res.data.body }))
         } catch (err) {
           toast.error("Lỗi tải phản hồi")
           return
@@ -387,72 +401,29 @@ export default function PostModal({
       setShowReplies(prev => ({ ...prev, [commentId]: true }))
     }
   }
+  const handleDeleteComment = async (commentId) => {
+  if (!window.confirm("Bạn có chắc muốn xóa bình luận này không?")) return
 
-  const currentMedia = media[page.index]
-  if (!Array.isArray(media) || !currentMedia) return null
+  try {
+    await api.delete(`/v1/comments/${commentId}`)
+    setLocalComments(prev => prev.filter(comment => comment.id !== commentId))
+    toast.success("Đã xóa bình luận")
+  } catch (err) {
+    toast.error("Lỗi khi xóa bình luận")
+  }
+}
+
+  const currentMedia = hasMedia ? media[page.index] : null
 
   return (
-    <Modal isOpen={true} onClose={onClose}>
-      <div className="flex flex-col md:flex-row w-full h-[90vh] bg-[var(--card)] text-[var(--card-foreground)] rounded-xl overflow-hidden">
-        {/* Media section */}
-        <div
-          className="relative w-full md:w-3/5 bg-black overflow-hidden"
-          onTouchStart={handleTouchStart}
-          onTouchEnd={handleTouchEnd}
-        >
-          <AnimatePresence initial={false} custom={page.direction}>
-            <motion.div
-              key={page.index}
-              className="absolute inset-0"
-              custom={page.direction}
-              variants={variants}
-              initial="enter"
-              animate="center"
-              exit="exit"
-              transition={{ duration: 0.2 }}
-            >
-              {isVideo(currentMedia) ? (
-                <video
-                  autoPlay
-                  controls
-                  className="w-full h-full object-contain"
-                  src={currentMedia}
-                />
-              ) : (
-                <Image
-                  src={currentMedia}
-                  alt={`Post media ${page.index + 1}`}
-                  fill
-                  unoptimized
-                  className="object-contain"
-                />
-              )}
-            </motion.div>
-          </AnimatePresence>
-
-          {page.index > 0 && (
-            <button
-              className="absolute top-1/2 left-2 -translate-y-1/2 p-1 bg-black/50 hover:bg-black/70 text-white rounded-full z-10"
-              onClick={showPrev}
-            >
-              <ChevronLeft />
-            </button>
-          )}
-          {page.index < media.length - 1 && (
-            <button
-              className="absolute top-1/2 right-2 -translate-y-1/2 p-1 bg-black/50 hover:bg-black/70 text-white rounded-full z-10"
-              onClick={showNext}
-            >
-              <ChevronRight />
-            </button>
-          )}
-        </div>
-
-        {/* Content section */}
-        <div className="w-full md:w-2/5 p-4 flex flex-col justify-between overflow-y-auto">
-          <div className="flex-1 overflow-y-auto mb-4">
+    <Modal isOpen={true} onClose={onClose} size={hasMedia ? undefined : "small"}>
+      <div className={`flex flex-col w-full ${hasMedia ? 'md:flex-row h-[90vh]' : 'h-auto max-h-[80vh]'} bg-[var(--card)] text-[var(--card-foreground)] rounded-xl overflow-hidden`}>
+        
+        {/* Layout for posts without media */}
+        {!hasMedia && (
+          <div className="flex flex-col w-full overflow-y-auto">
             {/* Header */}
-            <div className="flex items-center gap-3 mb-4">
+            <div className="flex items-center gap-3 p-4 border-b border-[var(--border)]">
               <Avatar
                 src={post.author?.profilePictureUrl}
                 alt={post.author?.username}
@@ -468,10 +439,12 @@ export default function PostModal({
             </div>
 
             {/* Content */}
-            <p className="text-sm mb-4">{post.content}</p>
+            <div className="p-4">
+              <p className="text-sm mb-4">{post.content}</p>
+            </div>
 
             {/* Actions */}
-            <div className="flex gap-4 text-[var(--muted-foreground)] mb-2">
+            <div className="flex gap-4 text-[var(--muted-foreground)] p-4 border-b border-[var(--border)]">
               <div>
                 <button onClick={onLikeToggle}>
                   <Heart
@@ -489,7 +462,7 @@ export default function PostModal({
             </div>
 
             {/* Comments */}
-            <div className="space-y-2 mb-4">
+            <div className="flex-1 p-4 space-y-2 overflow-y-auto">
               <p className="text-sm font-semibold">Bình luận</p>
               {loadingComments ? (
                 <p className="text-xs text-muted">Đang tải bình luận...</p>
@@ -521,13 +494,16 @@ export default function PostModal({
                           </div>
                         )}
 
-                        <CommentActions 
-                          comment={comment}
-                          onLike={handleCommentLike}
-                          onReply={handleReplyClick}
-                          onToggleReplies={handleToggleReplies}
-                          showReplies={showReplies[comment.id]}
-                        />
+<CommentActions 
+  comment={comment}
+  onLike={handleCommentLike}
+  onReply={handleReplyClick}
+  onToggleReplies={handleToggleReplies}
+  showReplies={showReplies[comment.id]}
+  onDelete={handleDeleteComment}
+  isOwnComment={comment.author?.id === post.author.id}
+/>
+
 
                         {/* Replies */}
                         {showReplies[comment.id] && (
@@ -588,48 +564,299 @@ export default function PostModal({
                 </div>
               )}
             </div>
-          </div>
 
-          {/* File Preview */}
-          {file && (
-            <FilePreviewInChat
-              selectedFile={file}
-              filePreview={previewUrl}
-              onCancel={handleRemoveFile}
-            />
-          )}
+            {/* File Preview */}
+            {file && (
+              <div className="p-4">
+                <FilePreviewInChat
+                  selectedFile={file}
+                  filePreview={previewUrl}
+                  onCancel={handleRemoveFile}
+                />
+              </div>
+            )}
 
-          {/* Comment input */}
-          <form
-            onSubmit={handleSubmit}
-            className="border-t border-[var(--border)] pt-2 flex items-center gap-2 p-2"
-          >
-            <input
-              type="text"
-              placeholder="Viết bình luận..."
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              className="flex-1 bg-transparent outline-none text-sm p-2"
-            />
-            <label className="text-sm text-blue-500 cursor-pointer hover:underline">
-              + Ảnh
-              <input
-                type="file"
-                accept="image/*,video/*"
-                hidden
-                onChange={handleFileChange}
-              />
-            </label>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="text-blue-500 text-sm font-semibold hover:opacity-80"
+            {/* Comment input */}
+            <form
+              onSubmit={handleSubmit}
+              className="border-t border-[var(--border)] pt-2 flex items-center gap-2 p-4"
             >
-              Gửi
-            </button>
-          </form>
-        </div>
-      </div>
-    </Modal>
-  )
+              <input
+                type="text"
+                placeholder="Viết bình luận..."
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                className="flex-1 bg-transparent outline-none text-sm p-2"
+              />
+              <label className="text-sm text-blue-500 cursor-pointer hover:underline">
+                + Ảnh
+                <input
+                  type="file"
+                  accept="image/*,video/*"
+                  hidden
+                  onChange={handleFileChange}
+                />
+              </label>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="text-blue-500 text-sm font-semibold hover:opacity-80"
+              >
+                Gửi
+              </button>
+            </form>
+          </div>
+        )}
+
+        {/* Layout for posts with media */}
+        {hasMedia && (
+          <>
+            {/* Desktop Layout */}
+            <div className="hidden md:flex md:w-2/3 md:h-full">
+              {/* Media section */}
+              <div
+                className="relative bg-black overflow-hidden w-full"
+                onTouchStart={handleTouchStart}
+                onTouchEnd={handleTouchEnd}
+              >
+                <AnimatePresence initial={false} custom={page.direction}>
+                  <motion.div
+                    key={page.index}
+                    className="absolute inset-0"
+                    custom={page.direction}
+                    variants={variants}
+                    initial="enter"
+                    animate="center"
+                    exit="exit"
+                    transition={{ duration: 0.2 }}
+                  >
+                    {isVideo(currentMedia) ? (
+                      <video
+                        autoPlay
+                        controls
+                        className="w-full h-full object-contain"
+                        src={currentMedia}
+                      />
+                    ) : (
+                      <Image
+                        src={currentMedia}
+                        alt={`Post media ${page.index + 1}`}
+                        fill
+                        unoptimized
+                        className="object-contain"
+                      />
+                    )}
+                  </motion.div>
+                </AnimatePresence>
+
+                {page.index > 0 && (
+                  <button
+                    className="absolute top-1/2 left-2 -translate-y-1/2 p-1 bg-black/50 hover:bg-black/70 text-white rounded-full z-10"
+                    onClick={showPrev}
+                  >
+                    <ChevronLeft />
+                  </button>
+                )}
+                {page.index < media.length - 1 && (
+                  <button
+                    className="absolute top-1/2 right-2 -translate-y-1/2 p-1 bg-black/50 hover:bg-black/70 text-white rounded-full z-10"
+                    onClick={showNext}
+                  >
+                    <ChevronRight />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Sidebar - Desktop */}
+            <div className="hidden md:flex md:flex-col md:w-1/3 md:h-full md:border-l md:border-[var(--border)]">
+              {/* Header */}
+              <div className="flex items-center gap-3 p-4 border-b border-[var(--border)]">
+                <Avatar
+                  src={post.author?.profilePictureUrl}
+                  alt={post.author?.username}
+                />
+                <div>
+                  <p className="font-semibold text-sm">
+                    {post.author?.givenName} {post.author?.familyName}
+                  </p>
+                  <p className="text-xs text-[var(--muted-foreground)]">
+                    {new Date(post.createdAt).toLocaleString()}
+                  </p>
+                </div>
+              </div>
+
+              {/* Content */}
+              <div className="p-4 border-b border-[var(--border)]">
+                <p className="text-sm mb-4">{post.content}</p>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-4 text-[var(--muted-foreground)] p-4 border-b border-[var(--border)]">
+                <div>
+                  <button onClick={onLikeToggle}>
+                    <Heart
+                      className={`h-5 w-5 ${liked ? "fill-red-500 text-red-500" : ""}`}
+                    />
+                  </button>
+                  <p className="text-xs">{likeCount} lượt thích</p>
+                </div>
+                <button>
+                  <MessageCircle className="h-5 w-5" />
+                </button>
+                <button>
+                  <SendHorizonal className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Comments */}
+              <div className="flex-1 p-4 space-y-2 overflow-y-auto">
+                <p className="text-sm font-semibold">Bình luận</p>
+                {loadingComments ? (
+                  <p className="text-xs text-muted">Đang tải bình luận...</p>
+                ) : localComments.length === 0 ? (
+                  <p className="text-xs text-muted">Chưa có bình luận nào</p>
+                ) : (
+                  <div className="space-y-4 mb-4">
+                    {localComments.map((comment) => (
+                      <div key={comment.id} className="flex gap-3 text-sm">
+                        <Avatar
+                          src={comment.author?.profilePictureUrl}
+                          alt={comment.author?.username}
+                          size={32}
+                        />
+                        <div className="flex-1">
+                          <div className="flex justify-between">
+                            <p className="font-semibold">
+                              {comment.author?.givenName} {comment.author?.familyName}
+                            </p>
+                            <span className="text-xs text-[var(--muted-foreground)]">
+                              {dayjs(comment.createdAt).fromNow()}
+                            </span>
+                          </div>
+                          <p className="text-sm mb-1">{comment.content}</p>
+                          
+                          {comment.fileUrl && (
+                            <div className="mb-1">
+                              <MediaDisplay url={comment.fileUrl} alt="comment media" />
+                            </div>
+                          )}
+
+                          <CommentActions 
+  comment={comment}
+  onLike={handleCommentLike}
+  onReply={handleReplyClick}
+  onToggleReplies={handleToggleReplies}
+  showReplies={showReplies[comment.id]}
+  onDelete={handleDeleteComment}
+  isOwnComment={comment.author?.id === post.author.id}
+/>
+
+
+                          {/* Replies */}
+                          {showReplies[comment.id] && (
+                            <div className="mt-3 pl-4 border-l-2 border-[var(--border)]">
+                              {loadingReplies[comment.id] ? (
+                                <p className="text-xs text-[var(--muted-foreground)]">Đang tải phản hồi...</p>
+                              ) : (
+                                <div className="space-y-3">
+                                  {repliesData[comment.id]?.map((reply) => (
+                                    <div key={reply.id} className="flex gap-2 text-sm">
+                                      <Avatar
+                                        src={reply.author?.profilePictureUrl}
+                                        alt={reply.author?.username}
+                                        size={24}
+                                      />
+                                      <div className="flex-1">
+                                        <div className="flex justify-between">
+                                          <p className="font-semibold text-xs">
+                                            {reply.author?.givenName} {reply.author?.familyName}
+                                          </p>
+                                          <span className="text-xs text-[var(--muted-foreground)]">
+                                            {dayjs(reply.createdAt).fromNow()}
+                                          </span>
+                                        </div>
+                                        <p className="text-xs mb-1">{reply.content}</p>
+                                        {reply.fileUrl && (
+                                          <div className="mb-1">
+                                            <MediaDisplay url={reply.fileUrl} alt="reply media" className="max-h-40" />
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Reply Form */}
+                          {replyingTo === comment.id && (
+                            <ReplyForm 
+                              commentId={comment.id}
+                              authorName={comment.author?.givenName}
+                              content={replyContent}
+                              setContent={setReplyContent}
+                              file={replyFile}
+                              setFile={setReplyFile}
+                              previewUrl={replyPreviewUrl}
+                              setPreviewUrl={setReplyPreviewUrl}
+                              isSubmitting={isSubmittingReply}
+                              onSubmit={handleReplySubmit}
+                              onCancel={handleReplyCancel}
+                            />
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* File Preview */}
+              {file && (
+                <div className="p-4">
+                  <FilePreviewInChat
+                    selectedFile={file}
+                    filePreview={previewUrl}
+                    onCancel={handleRemoveFile}
+                  />
+                </div>
+              )}
+
+              {/* Comment input */}
+              <form
+                onSubmit={handleSubmit}
+                className="border-t border-[var(--border)] pt-2 flex items-center gap-2 p-4"
+              >
+                <input
+  type="text"
+  placeholder="Viết bình luận..."
+  value={content}
+  onChange={(e) => setContent(e.target.value)}
+  className="flex-1 bg-transparent outline-none text-sm p-2"
+/>
+<label className="text-sm text-blue-500 cursor-pointer hover:underline">
+  + Ảnh
+  <input
+    type="file"
+    accept="image/*,video/*"
+    hidden
+    onChange={handleFileChange}
+  />
+</label>
+<button
+  type="submit"
+  disabled={isSubmitting || (!content.trim() && !file)}
+  className="text-blue-500 text-sm font-semibold hover:opacity-80 disabled:opacity-50"
+>
+  {isSubmitting ? "Đang gửi..." : "Gửi"}
+</button>
+</form>
+</div>
+</>
+)}
+</div>
+</Modal>
+)
 }
