@@ -1,25 +1,21 @@
-import { Geist, Geist_Mono } from "next/font/google";
-import  ThemeProvider  from "@/providers/ThemeProvider"
+import { Inter, Roboto_Mono } from "next/font/google";
+import ThemeProvider from "@/providers/ThemeProvider"
 import Script from "next/script";
 
-const geistSans = Geist({
+const geistSans = Inter({
   variable: "--font-geist-sans",
   subsets: ["latin"],
 });
 
-const geistMono = Geist_Mono({
+const geistMono = Roboto_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
 });
 
-
 export default function MainLayout({ children }) {
   return (
-    
-    <div>
+    <div className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
       {children}
     </div>
   );
 }
-
-

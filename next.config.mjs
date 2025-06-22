@@ -1,4 +1,3 @@
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
@@ -11,6 +10,21 @@ const nextConfig = {
         pathname: '/v1/files/**',
       },
     ],
+  },
+  // Thêm config này để đảm bảo tương thích
+  experimental: {
+    esmExternals: 'loose',
+  },
+  // Đảm bảo webpack config không conflict
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        path: false,
+      };
+    }
+    return config;
   },
 };
 

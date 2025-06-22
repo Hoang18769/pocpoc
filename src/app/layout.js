@@ -1,9 +1,13 @@
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter } from "next/font/google";
 import "./globals.css";
 import ThemeProvider from "@/providers/ThemeProvider";
 import Script from "next/script";
 import { NotificationProvider } from "@/store/NotificationContext";
-import { AuthProvider } from '@/hooks/useAuth'
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+});
 
 export default function RootLayout({ children }) {
   return (
@@ -30,10 +34,11 @@ export default function RootLayout({ children }) {
           }}
         />
       </head>
-      <body>
-      
+      <body className={`${inter.variable} antialiased`}>
         <ThemeProvider>
-          <NotificationProvider>{children}</NotificationProvider>{" "}
+          <NotificationProvider>
+              {children}
+          </NotificationProvider>
         </ThemeProvider>
       </body>
     </html>

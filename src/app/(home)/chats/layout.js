@@ -1,13 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import ChatList from "@/components/social-app-component/ChatList";
 import ChatBox from "@/components/social-app-component/ChatBox";
 import useAppStore from "@/store/ZustandStore";
 import useIsMobile from "@/hooks/useIsMobile";
 
-export default function ChatLayout() {
+// Tách component sử dụng useSearchParams
+function ChatLayoutContent() {
   const searchParams = useSearchParams();
   const [selectedChatId, setSelectedChatId] = useState(null);
   const [targetUser, setTargetUser] = useState(null);
@@ -119,7 +120,6 @@ export default function ChatLayout() {
       {/* ChatBox - hiển thị nếu đã chọn user */}
       {shouldShowChatBox && (
         <main className="flex-1 sm:w-[85%] md:w-[60%] rounded-2xl bg-[var(--card)] border border-[var(--border)] overflow-y-auto shadow-sm">
-          
           <ChatBox
             chatId={selectedChatId}
             targetUser={targetUser}
@@ -129,5 +129,21 @@ export default function ChatLayout() {
         </main>
       )}
     </div>
+  );
+}
+
+// Component chính với Suspense wrapper
+export default function ChatLayout() {
+  return (
+    <Suspense fallback={
+      <div className="pt-16 flex h-[calc(100vh-64px)] bg-[var(--background)] text-[var(--foreground)] items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+          <p className="text-muted-foreground">Loading chat...</p>
+        </div>
+      </div>
+    }>
+      <ChatLayoutContent />
+    </Suspense>
   );
 }

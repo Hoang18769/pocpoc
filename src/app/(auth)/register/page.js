@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"
 import { Eye, EyeOff, ArrowDown, ArrowLeftRight } from "lucide-react"
@@ -15,8 +15,21 @@ import api, { setAuthToken } from "@/utils/axios"
 import { jwtDecode } from "jwt-decode"
 import axios from "axios"
 
-export default function AuthPage() {
-  const [mode, setMode] = useState("login") // "login" hoặc "register"
+// Loading component
+function AuthPageLoading() {
+  return (
+    <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+        <p className="text-muted-foreground">Loading...</p>
+      </div>
+    </div>
+  )
+}
+
+// Component sử dụng useSearchParams - PHẢI được wrap trong Suspense
+function AuthFormWithParams() {
+  const [mode, setMode] = useState("login")
   const [showPassword, setShowPassword] = useState(false)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -24,14 +37,16 @@ export default function AuthPage() {
   const [givenName, setGivenName] = useState("")
   const [familyName, setFamilyName] = useState("")
   const [birthdate, setBirthdate] = useState("")
-  const formRef = useRef(null)
-  const { theme } = useTheme()
-  const searchParams = useSearchParams();
-  const router = useRouter()
   const [verifyMessage, setVerifyMessage] = useState("")
   const [verifying, setVerifying] = useState(false)
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState("")
+
+  const formRef = useRef(null)
+  const { theme } = useTheme()
+  const searchParams = useSearchParams() // Hook này cần Suspense
+  const router = useRouter()
+  const [formBoundsRef, { height }] = useMeasure()
 
   // Hàm parse lỗi tái sử dụng
   const parseApiError = (error) => {
@@ -44,10 +59,12 @@ export default function AuthPage() {
     }
   }
 
+  // Effect xử lý email verification từ URL params
   useEffect(() => {
     const verifyEmail = async () => {
       const emailParam = searchParams.get("email")
       const codeParam = searchParams.get("code")
+      
       if (!emailParam || !codeParam) return
 
       setVerifying(true)
@@ -57,8 +74,10 @@ export default function AuthPage() {
           { email: emailParam, code: codeParam },
           { headers: { "Content-Type": "application/json" }, timeout: 10000 }
         )
+        
         if (res.data.code === 200) {
           setVerifyMessage("✅ Xác thực email thành công! Bạn có thể đăng nhập.")
+          setMode("login") // Chuyển về login mode sau khi verify thành công
         }
       } catch (error) {
         console.error("Email verification error:", error)
@@ -77,11 +96,11 @@ export default function AuthPage() {
 
     if (mode === "register") {
       if (password !== confirmPassword) {
-        alert("Passwords do not match!")
+        setMessage("❌ Mật khẩu không khớp!")
         return
       }
       if ([givenName, familyName, birthdate].some((v) => !v)) {
-        alert("Please fill all fields")
+        setMessage("❌ Vui lòng điền đầy đủ thông tin")
         return
       }
 
@@ -94,9 +113,12 @@ export default function AuthPage() {
           familyName,
           birthdate,
         })
+        
         console.log(res)
         setMessage("✅ Đăng ký thành công! Vui lòng kiểm tra email để xác thực.")
         setMode("login")
+        
+        // Clear form
         setEmail("")
         setPassword("")
         setConfirmPassword("")
@@ -110,68 +132,67 @@ export default function AuthPage() {
       }
     } else if (mode === "login") {
       if ([email, password].some((v) => !v)) {
-        alert("Please fill all fields")
+        setMessage("❌ Vui lòng điền đầy đủ thông tin")
         return
       }
 
       setLoading(true)
       try {
         const res = await api.post(`/v1/auth/login`, { email, password })
-        if (res.data.code === 200) {
-          if (res.data.body.token) {           
-            const token = res.data.body.token;
-            console.log('🔐 Login success, token:', token.substring(0, 20) + '...');
+        
+        if (res.data.code === 200 && res.data.body.token) {           
+          const token = res.data.body.token
+          console.log('🔐 Login success, token:', token.substring(0, 20) + '...')
+          
+          const decoded = jwtDecode(token)
+          console.log('🔓 Decoded token:', decoded)
+          
+          // Step 1: Set localStorage
+          localStorage.setItem("accessToken", token)
+          localStorage.setItem("userId", decoded.sub)
+          localStorage.setItem("userName", decoded.username)
+          
+          // Step 2: Sync lên cookies
+          console.log('📝 Syncing to cookies...')
+          const syncSuccess = setAuthToken(token, decoded.sub, decoded.username)
+          
+          if (syncSuccess) {
+            console.log('✅ Cookies synced successfully')
             
-            const decoded = jwtDecode(token);
-            console.log('🔓 Decoded token:', decoded);
+            // Step 3: Verify
+            setTimeout(() => {
+              console.log('🔍 Final verification:', {
+                localStorage: {
+                  accessToken: !!localStorage.getItem('accessToken'),
+                  userId: localStorage.getItem('userId'),
+                  userName: localStorage.getItem('userName')
+                },
+                cookies: {
+                  accessToken: document.cookie.includes('accessToken='),
+                  userId: document.cookie.includes('userId='),
+                  userName: document.cookie.includes('userName='),
+                  raw: document.cookie
+                }
+              })
+            }, 200)
             
-            // ✅ Step 1: Set localStorage (giữ nguyên như cũ)
-            localStorage.setItem("accessToken", token);
-            localStorage.setItem("userId", decoded.sub);
-            localStorage.setItem("userName", decoded.username);
+            setMessage("✅ Đăng nhập thành công!")
+            setEmail("")
+            setPassword("")
             
-            // ✅ Step 2: THÊM - Sync lên cookies bằng setAuthToken
-            console.log('📝 Syncing to cookies...');
-            const syncSuccess = setAuthToken(token, decoded.sub, decoded.username);
+            // Step 4: Redirect
+            setTimeout(() => {
+              window.location.href = '/index'
+            }, 500)
             
-            if (syncSuccess) {
-              console.log('✅ Cookies synced successfully');
-              
-              // ✅ Step 3: Verify
-              setTimeout(() => {
-                console.log('🔍 Final verification:', {
-                  localStorage: {
-                    accessToken: !!localStorage.getItem('accessToken'),
-                    userId: localStorage.getItem('userId'),
-                    userName: localStorage.getItem('userName')
-                  },
-                  cookies: {
-                    accessToken: document.cookie.includes('accessToken='),
-                    userId: document.cookie.includes('userId='),
-                    userName: document.cookie.includes('userName='),
-                    raw: document.cookie
-                  }
-                });
-              }, 200);
-              
-              setMessage("✅ Đăng nhập thành công!")
-              setEmail("")
-              setPassword("")
-              
-              // ✅ Step 4: Redirect
-              setTimeout(() => {
-                window.location.href = '/index';
-              }, 500);
-              
-            } else {
-              console.error('❌ Failed to sync cookies');
-              setMessage("⚠️ Đăng nhập thành công nhưng có lỗi khi đồng bộ hóa phiên làm việc")
-              
-              // Fallback redirect sau khi hiển thị thông báo
-              setTimeout(() => {
-                router.push("/index")
-              }, 1200)
-            }
+          } else {
+            console.error('❌ Failed to sync cookies')
+            setMessage("⚠️ Đăng nhập thành công nhưng có lỗi khi đồng bộ hóa phiên làm việc")
+            
+            // Fallback redirect
+            setTimeout(() => {
+              router.push("/index")
+            }, 1200)
           }
         }
       } catch (error) {
@@ -186,12 +207,10 @@ export default function AuthPage() {
     formRef.current?.scrollIntoView({ behavior: "smooth" })
   }
 
-  const [formBoundsRef, { height }] = useMeasure()
-
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
       {/* Main Section */}
-      <main className="flex-grow flex flex-col md:flex-row h-full ">
+      <main className="flex-grow flex flex-col md:flex-row h-full">
         {/* Left Side (Image) */}
         <div className="w-full md:w-1/2 h-screen flex items-center justify-center bg-muted relative">
           <Image
@@ -224,7 +243,9 @@ export default function AuthPage() {
             style={{ overflow: "hidden" }}
           >
             <div className="flex justify-between items-center mb-6">
-              <h1 className="text-2xl font-bold">{mode === "login" ? "Sign in" : "Create your account"}</h1>
+              <h1 className="text-2xl font-bold">
+                {mode === "login" ? "Sign in" : "Create your account"}
+              </h1>
               <button
                 onClick={() => setMode(mode === "login" ? "register" : "login")}
                 className="text-sm text-muted-foreground hover:text-foreground transition"
@@ -234,29 +255,46 @@ export default function AuthPage() {
               </button>
             </div>
 
-            <motion.div animate={{ height }} transition={{ duration: 0.3, ease: "easeInOut" }} style={{ overflow: "hidden" }}>
+            <motion.div 
+              animate={{ height }} 
+              transition={{ duration: 0.3, ease: "easeInOut" }} 
+              style={{ overflow: "hidden" }}
+            >
               <div ref={formBoundsRef}>
                 <AnimatePresence mode="wait">
                   <MotionContainer key={mode} modeKey={mode} effect="fadeUp">
+                    {/* Verification message */}
                     {verifyMessage && (
                       <div
                         className={`p-3 text-sm rounded mb-4 ${
-                          verifyMessage.includes("✅") ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                          verifyMessage.includes("✅") 
+                            ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" 
+                            : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
                         }`}
                       >
                         {verifyMessage}
                       </div>
                     )}
 
+                    {/* General messages */}
                     {message && (
                       <div
                         className={`p-3 text-sm rounded mb-4 ${
-                          message.includes("✅") ? "bg-green-100 text-green-800" : 
-                          message.includes("⚠️") ? "bg-yellow-100 text-yellow-800" :
-                          "bg-red-100 text-red-800"
+                          message.includes("✅") 
+                            ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" : 
+                          message.includes("⚠️") 
+                            ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200" :
+                            "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
                         }`}
                       >
                         {message}
+                      </div>
+                    )}
+
+                    {/* Loading indicator */}
+                    {verifying && (
+                      <div className="p-3 text-sm rounded mb-4 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                        🔄 Đang xác thực email...
                       </div>
                     )}
 
@@ -270,13 +308,14 @@ export default function AuthPage() {
                           onChange={(e) => setEmail(e.target.value)}
                           className="w-full bg-transparent border-b border-input px-0 py-1 focus:outline-none focus:border-primary text-foreground"
                           required
+                          disabled={loading || verifying}
                         />
                       </div>
 
                       {/* Register mode extra fields */}
-                      <div className="flex space-x-4">
-                        {mode === "register" && (
-                          <>
+                      {mode === "register" && (
+                        <div className="space-y-4">
+                          <div className="flex space-x-4">
                             <div className="space-y-2 flex-1">
                               <h4 className="text-sm font-medium text-muted-foreground">Given Name</h4>
                               <input
@@ -285,6 +324,7 @@ export default function AuthPage() {
                                 onChange={(e) => setGivenName(e.target.value)}
                                 className="w-full bg-transparent border-b border-input px-0 py-1 focus:outline-none focus:border-primary text-foreground"
                                 required
+                                disabled={loading}
                               />
                             </div>
                             <div className="space-y-2 flex-1">
@@ -295,21 +335,23 @@ export default function AuthPage() {
                                 onChange={(e) => setFamilyName(e.target.value)}
                                 className="w-full bg-transparent border-b border-input px-0 py-1 focus:outline-none focus:border-primary text-foreground"
                                 required
+                                disabled={loading}
                               />
                             </div>
-                            <div className="space-y-2 flex-1">
-                              <h4 className="text-sm font-medium text-muted-foreground">Birthdate</h4>
-                              <input
-                                type="date"
-                                value={birthdate}
-                                onChange={(e) => setBirthdate(e.target.value)}
-                                className="w-full bg-transparent border-b border-input px-0 py-1 focus:outline-none focus:border-primary text-foreground"
-                                required
-                              />
-                            </div>
-                          </>
-                        )}
-                      </div>
+                          </div>
+                          <div className="space-y-2">
+                            <h4 className="text-sm font-medium text-muted-foreground">Birthdate</h4>
+                            <input
+                              type="date"
+                              value={birthdate}
+                              onChange={(e) => setBirthdate(e.target.value)}
+                              className="w-full bg-transparent border-b border-input px-0 py-1 focus:outline-none focus:border-primary text-foreground"
+                              required
+                              disabled={loading}
+                            />
+                          </div>
+                        </div>
+                      )}
 
                       {/* Password */}
                       <div className="space-y-2 relative">
@@ -321,6 +363,7 @@ export default function AuthPage() {
                           className="w-full bg-transparent border-b border-input px-0 py-1 focus:outline-none focus:border-primary pr-10 text-foreground"
                           required
                           minLength={6}
+                          disabled={loading || verifying}
                         />
                         <button
                           type="button"
@@ -328,6 +371,7 @@ export default function AuthPage() {
                           onClick={() => setShowPassword(!showPassword)}
                           tabIndex={-1}
                           aria-label={showPassword ? "Hide password" : "Show password"}
+                          disabled={loading || verifying}
                         >
                           {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                         </button>
@@ -344,17 +388,19 @@ export default function AuthPage() {
                             className="w-full bg-transparent border-b border-input px-0 py-1 focus:outline-none focus:border-primary text-foreground"
                             required
                             minLength={6}
+                            disabled={loading}
                           />
                         </div>
                       )}
 
                       <Button
                         type="submit"
-                        disabled={loading}
+                        disabled={loading || verifying}
                         className="w-full py-2"
                       >
                         {loading ? "Loading..." : mode === "login" ? "Sign in" : "Register"}
                       </Button>
+                      
                       <div className="mt-6 text-center text-sm text-muted-foreground">
                         <div>
                           Quên mật khẩu?{" "}
@@ -375,5 +421,14 @@ export default function AuthPage() {
         </div>
       </main>
     </div>
+  )
+}
+
+// Component chính - Export default
+export default function AuthPage() {
+  return (
+    <Suspense fallback={<AuthPageLoading />}>
+      <AuthFormWithParams />
+    </Suspense>
   )
 }

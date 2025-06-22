@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react"
+import { useEffect, useState, useRef, Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import Image from "next/image"
 import { ArrowLeft } from "lucide-react"
@@ -13,7 +13,8 @@ import MotionContainer from "@/components/ui-components/MotionContainer"
 import api from "@/utils/axios"
 import axios from "axios"
 
-export default function ResetPasswordPage() {
+// Separate component that uses useSearchParams
+function ResetPasswordContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const email = searchParams.get("email")
@@ -85,6 +86,96 @@ export default function ResetPasswordPage() {
   }
 
   return (
+    <div className="w-full md:w-1/2 min-h-screen flex items-center justify-center p-6 bg-background">
+      <div
+        className="w-full max-w-md text-card-foreground rounded-xl p-8 shadow-xl bg-[var(--card)]"
+        style={{ overflow: "hidden" }}
+      >
+        <div className="flex items-center mb-6">
+          <Link href="/login" className="mr-4 text-muted-foreground hover:text-foreground transition">
+            <ArrowLeft className="h-5 w-5" />
+          </Link>
+          <h1 className="text-2xl font-bold">Đặt lại mật khẩu</h1>
+        </div>
+
+        <motion.div animate={{ height }} transition={{ duration: 0.3 }} style={{ overflow: "hidden" }}>
+          <div ref={formBoundsRef}>
+            <MotionContainer modeKey="reset-password" effect="fadeUp">
+              {error ? (
+                <div className="bg-red-100 text-red-800 text-sm p-3 rounded">{error}</div>
+              ) : !verified ? (
+                <div className="text-muted-foreground text-sm">Đang xác minh...</div>
+              ) : (
+                <form onSubmit={handleSubmit} className="space-y-6">
+                  {message && (
+                    <div
+                      className={`p-3 text-sm rounded ${
+                        message.includes("✅") ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                      }`}
+                    >
+                      {message}
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-medium text-muted-foreground">Mật khẩu mới</h4>
+                    <input
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="w-full bg-transparent border-b border-input px-0 py-1 focus:outline-none focus:border-primary text-foreground"
+                      placeholder="Nhập mật khẩu mới"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-medium text-muted-foreground">Xác nhận mật khẩu</h4>
+                    <input
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="w-full bg-transparent border-b border-input px-0 py-1 focus:outline-none focus:border-primary text-foreground"
+                      placeholder="Nhập lại mật khẩu"
+                      required
+                    />
+                  </div>
+
+                  <div className="flex justify-center">
+                    <Button type="submit" disabled={loading} className="w-full max-w-xs text-center">
+                      {loading ? "Đang đặt lại..." : "Đặt lại mật khẩu"}
+                    </Button>
+                  </div>
+                </form>
+              )}
+            </MotionContainer>
+          </div>
+        </motion.div>
+      </div>
+    </div>
+  )
+}
+
+// Loading fallback component
+function LoadingFallback() {
+  return (
+    <div className="w-full md:w-1/2 min-h-screen flex items-center justify-center p-6 bg-background">
+      <div className="w-full max-w-md text-card-foreground rounded-xl p-8 shadow-xl bg-[var(--card)]">
+        <div className="flex items-center mb-6">
+          <Link href="/login" className="mr-4 text-muted-foreground hover:text-foreground transition">
+            <ArrowLeft className="h-5 w-5" />
+          </Link>
+          <h1 className="text-2xl font-bold">Đặt lại mật khẩu</h1>
+        </div>
+        <div className="text-muted-foreground text-sm">Đang tải...</div>
+      </div>
+    </div>
+  )
+}
+
+// Main component with Suspense boundary
+export default function ResetPasswordPage() {
+  return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
       <main className="flex-grow flex flex-col md:flex-row h-full">
         {/* Left Side */}
@@ -99,74 +190,10 @@ export default function ResetPasswordPage() {
           />
         </div>
 
-        {/* Right Side */}
-        <div className="w-full md:w-1/2 min-h-screen flex items-center justify-center p-6 bg-background">
-          <div
-            className="w-full max-w-md text-card-foreground rounded-xl p-8 shadow-xl bg-[var(--card)]"
-            style={{ overflow: "hidden" }}
-          >
-            <div className="flex items-center mb-6">
-              <Link href="/login" className="mr-4 text-muted-foreground hover:text-foreground transition">
-                <ArrowLeft className="h-5 w-5" />
-              </Link>
-              <h1 className="text-2xl font-bold">Đặt lại mật khẩu</h1>
-            </div>
-
-            <motion.div animate={{ height }} transition={{ duration: 0.3 }} style={{ overflow: "hidden" }}>
-              <div ref={formBoundsRef}>
-                <MotionContainer modeKey="reset-password" effect="fadeUp">
-                  {error ? (
-                    <div className="bg-red-100 text-red-800 text-sm p-3 rounded">{error}</div>
-                  ) : !verified ? (
-                    <div className="text-muted-foreground text-sm">Đang xác minh...</div>
-                  ) : (
-                    <form onSubmit={handleSubmit} className="space-y-6">
-                      {message && (
-                        <div
-                          className={`p-3 text-sm rounded ${
-                            message.includes("✅") ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-                          }`}
-                        >
-                          {message}
-                        </div>
-                      )}
-
-                      <div className="space-y-2">
-                        <h4 className="text-sm font-medium text-muted-foreground">Mật khẩu mới</h4>
-                        <input
-                          type="password"
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          className="w-full bg-transparent border-b border-input px-0 py-1 focus:outline-none focus:border-primary text-foreground"
-                          placeholder="Nhập mật khẩu mới"
-                          required
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <h4 className="text-sm font-medium text-muted-foreground">Xác nhận mật khẩu</h4>
-                        <input
-                          type="password"
-                          value={confirmPassword}
-                          onChange={(e) => setConfirmPassword(e.target.value)}
-                          className="w-full bg-transparent border-b border-input px-0 py-1 focus:outline-none focus:border-primary text-foreground"
-                          placeholder="Nhập lại mật khẩu"
-                          required
-                        />
-                      </div>
-
-                      <div className="flex justify-center">
-                        <Button type="submit" disabled={loading} className="w-full max-w-xs text-center">
-                          {loading ? "Đang đặt lại..." : "Đặt lại mật khẩu"}
-                        </Button>
-                      </div>
-                    </form>
-                  )}
-                </MotionContainer>
-              </div>
-            </motion.div>
-          </div>
-        </div>
+        {/* Right Side with Suspense */}
+        <Suspense fallback={<LoadingFallback />}>
+          <ResetPasswordContent />
+        </Suspense>
       </main>
     </div>
   )

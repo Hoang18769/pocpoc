@@ -7,7 +7,7 @@ export function middleware(request) {
   const token = request.cookies.get('token')?.value || request.cookies.get('accessToken')?.value;
   const userId = request.cookies.get('userId')?.value;
   
-  console.log('🔍 Middleware check:', { 
+  console.log('🔍 Middleware check:', {
     pathname,
     hasToken: !!token,
     hasUserId: !!userId
@@ -22,17 +22,26 @@ export function middleware(request) {
   
   const authRoutes = ['/register', '/login', '/auth'];
   
-  // Check route types - cần check trước khi rewrite
+  // Check route types
   const isProtectedRoute = protectedRoutes.some(route => 
     pathname.startsWith(route)
-  ) || pathname === '/'; // root path cũng là protected
+  );
   
   const isAuthRoute = authRoutes.some(route => 
     pathname.startsWith(route)
   );
   
-  // Determine authentication status - only check for token presence
+  // Determine authentication status
   const isAuthenticated = token && userId;
+  
+  // Handle root path FIRST - tránh vòng lặp
+  if (pathname === '/') {
+    if (isAuthenticated) {
+      return NextResponse.rewrite(new URL('/index', request.url));
+    } else {
+      return NextResponse.redirect(new URL('/register', request.url));
+    }
+  }
   
   // If user is authenticated and trying to access auth pages, redirect to index
   if (isAuthenticated && isAuthRoute) {
@@ -44,11 +53,6 @@ export function middleware(request) {
   if (isProtectedRoute && !isAuthenticated) {
     console.log('❌ Unauthenticated user accessing protected route, redirecting to register');
     return NextResponse.redirect(new URL('/register', request.url));
-  }
-  
-  // Rewrite root path to /index - chỉ khi đã authenticated
-  if (pathname === '/') {
-    return NextResponse.rewrite(new URL('/index', request.url));
   }
   
   // Default: allow the request to continue
