@@ -1,7 +1,7 @@
-"use client"
+"use client";
 
-import Image from "next/image"
-import { useState, useEffect } from "react"
+import Image from "next/image";
+import { useState, useEffect } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -10,14 +10,14 @@ import {
   SendHorizonal,
   ChevronDown,
   ChevronUp,
-} from "lucide-react"
-import Avatar from "../ui-components/Avatar"
-import Modal from "../ui-components/Modal"
-import FilePreviewInChat from "../ui-components/FilePreviewInChat"
-import { AnimatePresence, motion } from "framer-motion"
-import dayjs from "dayjs"
-import api from "@/utils/axios"
-import toast from "react-hot-toast"
+} from "lucide-react";
+import Avatar from "../ui-components/Avatar";
+import Modal from "../ui-components/Modal";
+import FilePreviewInChat from "../ui-components/FilePreviewInChat";
+import { AnimatePresence, motion } from "framer-motion";
+import dayjs from "dayjs";
+import api from "@/utils/axios";
+import toast from "react-hot-toast";
 
 const variants = {
   enter: (direction) => ({
@@ -32,25 +32,35 @@ const variants = {
     x: direction < 0 ? 300 : -300,
     opacity: 0,
   }),
-}
+};
 
-const isVideo = (url = "") => /\.(mp4|webm|ogg)$/i.test(url)
+const isVideo = (url = "") => /\.(mp4|webm|ogg)$/i.test(url);
 
 // Component for Comment Actions
-const CommentActions = ({ comment, onLike, onReply, onToggleReplies, showReplies, onDelete, isOwnComment }) => (
+const CommentActions = ({
+  comment,
+  onLike,
+  onReply,
+  onToggleReplies,
+  showReplies,
+  onDelete,
+  isOwnComment,
+}) => (
   <div className="flex items-center gap-4 text-xs text-[var(--muted-foreground)]">
-    <button 
+    <button
       className="hover:underline flex items-center gap-1 transition-colors"
       onClick={() => onLike(comment.id, comment.liked)}
     >
       <Heart
         size={14}
-        className={comment.liked ? "fill-red-500 text-red-500" : "hover:text-red-500"}
+        className={
+          comment.liked ? "fill-red-500 text-red-500" : "hover:text-red-500"
+        }
       />
       {comment.likeCount}
     </button>
 
-    <button 
+    <button
       className="hover:underline flex items-center gap-1"
       onClick={() => onReply(comment.id)}
     >
@@ -59,7 +69,7 @@ const CommentActions = ({ comment, onLike, onReply, onToggleReplies, showReplies
     </button>
 
     {comment.replyCount > 0 && (
-      <button 
+      <button
         className="hover:underline flex items-center gap-1 text-blue-500"
         onClick={() => onToggleReplies(comment.id)}
       >
@@ -69,7 +79,7 @@ const CommentActions = ({ comment, onLike, onReply, onToggleReplies, showReplies
     )}
 
     {isOwnComment && (
-      <button 
+      <button
         className="hover:underline text-red-500"
         onClick={() => onDelete(comment.id)}
       >
@@ -77,11 +87,10 @@ const CommentActions = ({ comment, onLike, onReply, onToggleReplies, showReplies
       </button>
     )}
   </div>
-)
-
+);
 
 // Component for Media Display
-const MediaDisplay = ({ url, alt, className }) => (
+const MediaDisplay = ({ url, alt, className }) =>
   isVideo(url) ? (
     <video
       controls
@@ -96,37 +105,34 @@ const MediaDisplay = ({ url, alt, className }) => (
       height={200}
       className={`rounded-lg max-h-60 w-auto object-contain ${className}`}
     />
-  )
-)
+  );
 
 // Component for Reply Form
-const ReplyForm = ({ 
-  commentId, 
-  authorName, 
-  content, 
-  setContent, 
-  file, 
-  setFile, 
-  previewUrl, 
+const ReplyForm = ({
+  commentId,
+  authorName,
+  content,
+  setContent,
+  file,
+  setFile,
+  previewUrl,
   setPreviewUrl,
-  isSubmitting, 
-  onSubmit, 
-  onCancel 
+  isSubmitting,
+  onSubmit,
+  onCancel,
 }) => {
   const handleFileChange = (e) => {
-    const f = e.target.files[0]
+    const f = e.target.files[0];
     if (f) {
-      setFile(f)
-      setPreviewUrl(URL.createObjectURL(f))
+      setFile(f);
+      setPreviewUrl(URL.createObjectURL(f));
     }
-  }
+  };
 
   const handleFileRemove = () => {
-    setFile(null)
-    setPreviewUrl(null)
-  }
-
-
+    setFile(null);
+    setPreviewUrl(null);
+  };
 
   return (
     <div className="mt-3 pl-4 border-l-2 border-[var(--border)]">
@@ -140,7 +146,10 @@ const ReplyForm = ({
         </div>
       )}
 
-      <form onSubmit={(e) => onSubmit(e, commentId)} className="flex flex-col gap-2">
+      <form
+        onSubmit={(e) => onSubmit(e, commentId)}
+        className="flex flex-col gap-2"
+      >
         <div className="flex items-center gap-2">
           <input
             type="text"
@@ -160,7 +169,7 @@ const ReplyForm = ({
             />
           </label>
         </div>
-        
+
         <div className="flex items-center gap-2 justify-end">
           <button
             type="button"
@@ -179,8 +188,8 @@ const ReplyForm = ({
         </div>
       </form>
     </div>
-  )
-}
+  );
+};
 
 export default function PostModal({
   post,
@@ -194,231 +203,239 @@ export default function PostModal({
   onCommentSubmit,
   onCommentUpdate,
 }) {
-  const media = post?.files || post?.images || []
-  const hasMedia = Array.isArray(media) && media.length > 0
-  
-  const [page, setPage] = useState({ index: activeIndex, direction: 0 })
-  const [touchStartX, setTouchStartX] = useState(null)
-  
+  const media = post?.files || post?.images || [];
+  const hasMedia = Array.isArray(media) && media.length > 0;
+
+  const [page, setPage] = useState({ index: activeIndex, direction: 0 });
+  const [touchStartX, setTouchStartX] = useState(null);
+
   // Main comment form state
-  const [content, setContent] = useState("")
-  const [file, setFile] = useState(null)
-  const [previewUrl, setPreviewUrl] = useState(null)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  
+  const [content, setContent] = useState("");
+  const [file, setFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   // Comments state
-  const [localComments, setLocalComments] = useState(comments)
-  const [repliesData, setRepliesData] = useState({}) // Store replies for each comment
-  const [showReplies, setShowReplies] = useState({}) // Track which replies are shown
-  const [loadingReplies, setLoadingReplies] = useState({}) // Track loading state for replies
-  
+  const [localComments, setLocalComments] = useState(comments);
+  const [repliesData, setRepliesData] = useState({}); // Store replies for each comment
+  const [showReplies, setShowReplies] = useState({}); // Track which replies are shown
+  const [loadingReplies, setLoadingReplies] = useState({}); // Track loading state for replies
+
   // Reply form state
-  const [replyingTo, setReplyingTo] = useState(null)
-  const [replyContent, setReplyContent] = useState("")
-  const [replyFile, setReplyFile] = useState(null)
-  const [replyPreviewUrl, setReplyPreviewUrl] = useState(null)
-  const [isSubmittingReply, setIsSubmittingReply] = useState(false)
+  const [replyingTo, setReplyingTo] = useState(null);
+  const [replyContent, setReplyContent] = useState("");
+  const [replyFile, setReplyFile] = useState(null);
+  const [replyPreviewUrl, setReplyPreviewUrl] = useState(null);
+  const [isSubmittingReply, setIsSubmittingReply] = useState(false);
 
   // Update local comments when comments prop changes
   useEffect(() => {
-    setLocalComments(comments)
-  }, [comments])
+    setLocalComments(comments);
+  }, [comments]);
 
   // Navigation functions
   const showNext = () => {
     if (hasMedia && page.index < media.length - 1) {
-      setPage({ index: page.index + 1, direction: 1 })
+      setPage({ index: page.index + 1, direction: 1 });
     }
-  }
+  };
 
   const showPrev = () => {
     if (hasMedia && page.index > 0) {
-      setPage({ index: page.index - 1, direction: -1 })
+      setPage({ index: page.index - 1, direction: -1 });
     }
-  }
+  };
 
   // Touch handlers
-  const handleTouchStart = (e) => setTouchStartX(e.touches[0].clientX)
+  const handleTouchStart = (e) => setTouchStartX(e.touches[0].clientX);
   const handleTouchEnd = (e) => {
-    if (touchStartX === null || !hasMedia) return
-    const deltaX = e.changedTouches[0].clientX - touchStartX
-    if (deltaX > 50) showPrev()
-    else if (deltaX < -50) showNext()
-    setTouchStartX(null)
-  }
+    if (touchStartX === null || !hasMedia) return;
+    const deltaX = e.changedTouches[0].clientX - touchStartX;
+    if (deltaX > 50) showPrev();
+    else if (deltaX < -50) showNext();
+    setTouchStartX(null);
+  };
 
   // File handlers for main comment
   const handleFileChange = (e) => {
-    const f = e.target.files[0]
+    const f = e.target.files[0];
     if (f) {
-      setFile(f)
-      setPreviewUrl(URL.createObjectURL(f))
+      setFile(f);
+      setPreviewUrl(URL.createObjectURL(f));
     }
-  }
+  };
 
   const handleRemoveFile = () => {
-    setFile(null)
-    setPreviewUrl(null)
-  }
+    setFile(null);
+    setPreviewUrl(null);
+  };
 
   // Main comment submission
   const handleSubmit = async (e) => {
-    e.preventDefault()
-    if (!content.trim() && !file) return
+    e.preventDefault();
+    if (!content.trim() && !file) return;
 
     try {
-      setIsSubmitting(true)
-      const formData = new FormData()
-      formData.append("content", content)
-      formData.append("postId", post.id)
-      if (file) formData.append("file", file)
+      setIsSubmitting(true);
+      const formData = new FormData();
+      formData.append("content", content);
+      formData.append("postId", post.id);
+      if (file) formData.append("file", file);
 
-      const res = await api.post("/v1/comments", formData)
-      if (onCommentSubmit) onCommentSubmit(res.data)
-      
-      setLocalComments(prev => [res.data, ...prev])
-      setContent("")
-      handleRemoveFile()
+      const res = await api.post("/v1/comments", formData);
+      if (onCommentSubmit) onCommentSubmit(res.data);
+
+      setLocalComments((prev) => [res.data, ...prev]);
+      setContent("");
+      handleRemoveFile();
     } catch (err) {
-      toast.error("Lỗi gửi bình luận")
+      toast.error("Lỗi gửi bình luận");
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
-  }
+  };
 
   // Comment like handler
   const handleCommentLike = async (commentId, isCurrentlyLiked) => {
     try {
-      const endpoint = isCurrentlyLiked 
-        ? `/v1/comments/unlike/${commentId}` 
-        : `/v1/comments/like/${commentId}`
-      
+      const endpoint = isCurrentlyLiked
+        ? `/v1/comments/unlike/${commentId}`
+        : `/v1/comments/like/${commentId}`;
+
       if (isCurrentlyLiked) {
-        await api.delete(endpoint)
+        await api.delete(endpoint);
       } else {
-        await api.post(endpoint)
+        await api.post(endpoint);
       }
 
       // Update local state
-      setLocalComments(prev => 
-        prev.map(comment => 
-          comment.id === commentId 
+      setLocalComments((prev) =>
+        prev.map((comment) =>
+          comment.id === commentId
             ? {
                 ...comment,
                 liked: !isCurrentlyLiked,
-                likeCount: isCurrentlyLiked 
-                  ? comment.likeCount - 1 
-                  : comment.likeCount + 1
+                likeCount: isCurrentlyLiked
+                  ? comment.likeCount - 1
+                  : comment.likeCount + 1,
               }
             : comment
         )
-      )
+      );
 
       if (onCommentUpdate) {
-        onCommentUpdate(commentId, !isCurrentlyLiked)
+        onCommentUpdate(commentId, !isCurrentlyLiked);
       }
-
     } catch (err) {
-      toast.error("Lỗi khi thích bình luận")
+      toast.error("Lỗi khi thích bình luận");
     }
-  }
+  };
 
   // Reply handlers
   const handleReplyClick = (commentId) => {
-    setReplyingTo(commentId)
-    setReplyContent("")
-    setReplyFile(null)
-    setReplyPreviewUrl(null)
-  }
+    setReplyingTo(commentId);
+    setReplyContent("");
+    setReplyFile(null);
+    setReplyPreviewUrl(null);
+  };
 
   const handleReplyCancel = () => {
-    setReplyingTo(null)
-    setReplyContent("")
-    setReplyFile(null)
-    setReplyPreviewUrl(null)
-  }
+    setReplyingTo(null);
+    setReplyContent("");
+    setReplyFile(null);
+    setReplyPreviewUrl(null);
+  };
 
   const handleReplySubmit = async (e, commentId) => {
-    e.preventDefault()
-    if (!replyContent.trim() && !replyFile) return
+    e.preventDefault();
+    if (!replyContent.trim() && !replyFile) return;
 
     try {
-      setIsSubmittingReply(true)
-      const formData = new FormData()
-      formData.append("originalCommentId", commentId)
-      formData.append("content", replyContent)
-      if (replyFile) formData.append("file", replyFile)
+      setIsSubmittingReply(true);
+      const formData = new FormData();
+      formData.append("originalCommentId", commentId);
+      formData.append("content", replyContent);
+      if (replyFile) formData.append("file", replyFile);
 
-      const res = await api.post(`/v1/comments/reply`, formData)
-      
+      const res = await api.post(`/v1/comments/reply`, formData);
+
       // Update reply count
-      setLocalComments(prev => 
-        prev.map(comment => 
-          comment.id === commentId 
+      setLocalComments((prev) =>
+        prev.map((comment) =>
+          comment.id === commentId
             ? { ...comment, replyCount: comment.replyCount + 1 }
             : comment
         )
-      )
+      );
 
       // Add to replies data if currently showing replies
       if (showReplies[commentId]) {
-        setRepliesData(prev => ({
+        setRepliesData((prev) => ({
           ...prev,
-          [commentId]: [res.data, ...(prev[commentId] || [])]
-        }))
+          [commentId]: [res.data, ...(prev[commentId] || [])],
+        }));
       }
 
-      handleReplyCancel()
-      toast.success("Đã trả lời bình luận")
+      handleReplyCancel();
+      toast.success("Đã trả lời bình luận");
     } catch (err) {
-      toast.error("Lỗi khi trả lời bình luận")
+      toast.error("Lỗi khi trả lời bình luận");
     } finally {
-      setIsSubmittingReply(false)
+      setIsSubmittingReply(false);
     }
-  }
+  };
 
   // Toggle replies visibility
   const handleToggleReplies = async (commentId) => {
-    const isCurrentlyShowing = showReplies[commentId]
-    
+    const isCurrentlyShowing = showReplies[commentId];
+
     if (isCurrentlyShowing) {
       // Hide replies
-      setShowReplies(prev => ({ ...prev, [commentId]: false }))
+      setShowReplies((prev) => ({ ...prev, [commentId]: false }));
     } else {
       // Show replies - fetch if not already loaded
       if (!repliesData[commentId]) {
-        setLoadingReplies(prev => ({ ...prev, [commentId]: true }))
+        setLoadingReplies((prev) => ({ ...prev, [commentId]: true }));
         try {
-          const res = await api.get(`/v1/comments/of-comment/${commentId}`)
-          setRepliesData(prev => ({ ...prev, [commentId]: res.data.body }))
+          const res = await api.get(`/v1/comments/of-comment/${commentId}`);
+          setRepliesData((prev) => ({ ...prev, [commentId]: res.data.body }));
         } catch (err) {
-          toast.error("Lỗi tải phản hồi")
-          return
+          toast.error("Lỗi tải phản hồi");
+          return;
         } finally {
-          setLoadingReplies(prev => ({ ...prev, [commentId]: false }))
+          setLoadingReplies((prev) => ({ ...prev, [commentId]: false }));
         }
       }
-      setShowReplies(prev => ({ ...prev, [commentId]: true }))
+      setShowReplies((prev) => ({ ...prev, [commentId]: true }));
     }
-  }
+  };
   const handleDeleteComment = async (commentId) => {
-  if (!window.confirm("Bạn có chắc muốn xóa bình luận này không?")) return
+    if (!window.confirm("Bạn có chắc muốn xóa bình luận này không?")) return;
 
-  try {
-    await api.delete(`/v1/comments/${commentId}`)
-    setLocalComments(prev => prev.filter(comment => comment.id !== commentId))
-    toast.success("Đã xóa bình luận")
-  } catch (err) {
-    toast.error("Lỗi khi xóa bình luận")
-  }
-}
+    try {
+      await api.delete(`/v1/comments/${commentId}`);
+      setLocalComments((prev) =>
+        prev.filter((comment) => comment.id !== commentId)
+      );
+      toast.success("Đã xóa bình luận");
+    } catch (err) {
+      toast.error("Lỗi khi xóa bình luận");
+    }
+  };
 
-  const currentMedia = hasMedia ? media[page.index] : null
+  const currentMedia = hasMedia ? media[page.index] : null;
 
   return (
-    <Modal isOpen={true} onClose={onClose} size={hasMedia ? undefined : "small"}>
-      <div className={`flex flex-col w-full ${hasMedia ? 'md:flex-row h-[90vh]' : 'h-auto max-h-[80vh]'} bg-[var(--card)] text-[var(--card-foreground)] rounded-xl overflow-hidden`}>
-        
+    <Modal
+      isOpen={true}
+      onClose={onClose}
+      size={hasMedia ? undefined : "small"}
+    >
+      <div
+        className={`flex flex-col w-full ${
+          hasMedia ? "md:flex-row h-[90vh]" : "h-auto max-h-[80vh]"
+        } bg-[var(--card)] text-[var(--card-foreground)] rounded-xl overflow-hidden`}
+      >
         {/* Layout for posts without media */}
         {!hasMedia && (
           <div className="flex flex-col w-full overflow-y-auto">
@@ -448,7 +465,9 @@ export default function PostModal({
               <div>
                 <button onClick={onLikeToggle}>
                   <Heart
-                    className={`h-5 w-5 ${liked ? "fill-red-500 text-red-500" : ""}`}
+                    className={`h-5 w-5 ${
+                      liked ? "fill-red-500 text-red-500" : ""
+                    }`}
                   />
                 </button>
                 <p className="text-xs">{likeCount} lượt thích</p>
@@ -480,40 +499,48 @@ export default function PostModal({
                       <div className="flex-1">
                         <div className="flex justify-between">
                           <p className="font-semibold">
-                            {comment.author?.givenName} {comment.author?.familyName}
+                            {comment.author?.givenName}{" "}
+                            {comment.author?.familyName}
                           </p>
                           <span className="text-xs text-[var(--muted-foreground)]">
                             {dayjs(comment.createdAt).fromNow()}
                           </span>
                         </div>
                         <p className="text-sm mb-1">{comment.content}</p>
-                        
+
                         {comment.fileUrl && (
                           <div className="mb-1">
-                            <MediaDisplay url={comment.fileUrl} alt="comment media" />
+                            <MediaDisplay
+                              url={comment.fileUrl}
+                              alt="comment media"
+                            />
                           </div>
                         )}
 
-<CommentActions 
-  comment={comment}
-  onLike={handleCommentLike}
-  onReply={handleReplyClick}
-  onToggleReplies={handleToggleReplies}
-  showReplies={showReplies[comment.id]}
-  onDelete={handleDeleteComment}
-  isOwnComment={comment.author?.id === post.author.id}
-/>
-
+                        <CommentActions
+                          comment={comment}
+                          onLike={handleCommentLike}
+                          onReply={handleReplyClick}
+                          onToggleReplies={handleToggleReplies}
+                          showReplies={showReplies[comment.id]}
+                          onDelete={handleDeleteComment}
+                          isOwnComment={comment.author?.id === post.author.id}
+                        />
 
                         {/* Replies */}
                         {showReplies[comment.id] && (
                           <div className="mt-3 pl-4 border-l-2 border-[var(--border)]">
                             {loadingReplies[comment.id] ? (
-                              <p className="text-xs text-[var(--muted-foreground)]">Đang tải phản hồi...</p>
+                              <p className="text-xs text-[var(--muted-foreground)]">
+                                Đang tải phản hồi...
+                              </p>
                             ) : (
                               <div className="space-y-3">
                                 {repliesData[comment.id]?.map((reply) => (
-                                  <div key={reply.id} className="flex gap-2 text-sm">
+                                  <div
+                                    key={reply.id}
+                                    className="flex gap-2 text-sm"
+                                  >
                                     <Avatar
                                       src={reply.author?.profilePictureUrl}
                                       alt={reply.author?.username}
@@ -522,16 +549,23 @@ export default function PostModal({
                                     <div className="flex-1">
                                       <div className="flex justify-between">
                                         <p className="font-semibold text-xs">
-                                          {reply.author?.givenName} {reply.author?.familyName}
+                                          {reply.author?.givenName}{" "}
+                                          {reply.author?.familyName}
                                         </p>
                                         <span className="text-xs text-[var(--muted-foreground)]">
                                           {dayjs(reply.createdAt).fromNow()}
                                         </span>
                                       </div>
-                                      <p className="text-xs mb-1">{reply.content}</p>
+                                      <p className="text-xs mb-1">
+                                        {reply.content}
+                                      </p>
                                       {reply.fileUrl && (
                                         <div className="mb-1">
-                                          <MediaDisplay url={reply.fileUrl} alt="reply media" className="max-h-40" />
+                                          <MediaDisplay
+                                            url={reply.fileUrl}
+                                            alt="reply media"
+                                            className="max-h-40"
+                                          />
                                         </div>
                                       )}
                                     </div>
@@ -544,7 +578,7 @@ export default function PostModal({
 
                         {/* Reply Form */}
                         {replyingTo === comment.id && (
-                          <ReplyForm 
+                          <ReplyForm
                             commentId={comment.id}
                             authorName={comment.author?.givenName}
                             content={replyContent}
@@ -696,7 +730,9 @@ export default function PostModal({
                 <div>
                   <button onClick={onLikeToggle}>
                     <Heart
-                      className={`h-5 w-5 ${liked ? "fill-red-500 text-red-500" : ""}`}
+                      className={`h-5 w-5 ${
+                        liked ? "fill-red-500 text-red-500" : ""
+                      }`}
                     />
                   </button>
                   <p className="text-xs">{likeCount} lượt thích</p>
@@ -728,40 +764,48 @@ export default function PostModal({
                         <div className="flex-1">
                           <div className="flex justify-between">
                             <p className="font-semibold">
-                              {comment.author?.givenName} {comment.author?.familyName}
+                              {comment.author?.givenName}{" "}
+                              {comment.author?.familyName}
                             </p>
                             <span className="text-xs text-[var(--muted-foreground)]">
                               {dayjs(comment.createdAt).fromNow()}
                             </span>
                           </div>
                           <p className="text-sm mb-1">{comment.content}</p>
-                          
+
                           {comment.fileUrl && (
                             <div className="mb-1">
-                              <MediaDisplay url={comment.fileUrl} alt="comment media" />
+                              <MediaDisplay
+                                url={comment.fileUrl}
+                                alt="comment media"
+                              />
                             </div>
                           )}
 
-                          <CommentActions 
-  comment={comment}
-  onLike={handleCommentLike}
-  onReply={handleReplyClick}
-  onToggleReplies={handleToggleReplies}
-  showReplies={showReplies[comment.id]}
-  onDelete={handleDeleteComment}
-  isOwnComment={comment.author?.id === post.author.id}
-/>
-
+                          <CommentActions
+                            comment={comment}
+                            onLike={handleCommentLike}
+                            onReply={handleReplyClick}
+                            onToggleReplies={handleToggleReplies}
+                            showReplies={showReplies[comment.id]}
+                            onDelete={handleDeleteComment}
+                            isOwnComment={comment.author?.id === post.author.id}
+                          />
 
                           {/* Replies */}
                           {showReplies[comment.id] && (
                             <div className="mt-3 pl-4 border-l-2 border-[var(--border)]">
                               {loadingReplies[comment.id] ? (
-                                <p className="text-xs text-[var(--muted-foreground)]">Đang tải phản hồi...</p>
+                                <p className="text-xs text-[var(--muted-foreground)]">
+                                  Đang tải phản hồi...
+                                </p>
                               ) : (
                                 <div className="space-y-3">
                                   {repliesData[comment.id]?.map((reply) => (
-                                    <div key={reply.id} className="flex gap-2 text-sm">
+                                    <div
+                                      key={reply.id}
+                                      className="flex gap-2 text-sm"
+                                    >
                                       <Avatar
                                         src={reply.author?.profilePictureUrl}
                                         alt={reply.author?.username}
@@ -770,16 +814,23 @@ export default function PostModal({
                                       <div className="flex-1">
                                         <div className="flex justify-between">
                                           <p className="font-semibold text-xs">
-                                            {reply.author?.givenName} {reply.author?.familyName}
+                                            {reply.author?.givenName}{" "}
+                                            {reply.author?.familyName}
                                           </p>
                                           <span className="text-xs text-[var(--muted-foreground)]">
                                             {dayjs(reply.createdAt).fromNow()}
                                           </span>
                                         </div>
-                                        <p className="text-xs mb-1">{reply.content}</p>
+                                        <p className="text-xs mb-1">
+                                          {reply.content}
+                                        </p>
                                         {reply.fileUrl && (
                                           <div className="mb-1">
-                                            <MediaDisplay url={reply.fileUrl} alt="reply media" className="max-h-40" />
+                                            <MediaDisplay
+                                              url={reply.fileUrl}
+                                              alt="reply media"
+                                              className="max-h-40"
+                                            />
                                           </div>
                                         )}
                                       </div>
@@ -792,7 +843,7 @@ export default function PostModal({
 
                           {/* Reply Form */}
                           {replyingTo === comment.id && (
-                            <ReplyForm 
+                            <ReplyForm
                               commentId={comment.id}
                               authorName={comment.author?.givenName}
                               content={replyContent}
@@ -830,33 +881,33 @@ export default function PostModal({
                 className="border-t border-[var(--border)] pt-2 flex items-center gap-2 p-4"
               >
                 <input
-  type="text"
-  placeholder="Viết bình luận..."
-  value={content}
-  onChange={(e) => setContent(e.target.value)}
-  className="flex-1 bg-transparent outline-none text-sm p-2"
-/>
-<label className="text-sm text-blue-500 cursor-pointer hover:underline">
-  + Ảnh
-  <input
-    type="file"
-    accept="image/*,video/*"
-    hidden
-    onChange={handleFileChange}
-  />
-</label>
-<button
-  type="submit"
-  disabled={isSubmitting || (!content.trim() && !file)}
-  className="text-blue-500 text-sm font-semibold hover:opacity-80 disabled:opacity-50"
->
-  {isSubmitting ? "Đang gửi..." : "Gửi"}
-</button>
-</form>
-</div>
-</>
-)}
-</div>
-</Modal>
-)
+                  type="text"
+                  placeholder="Viết bình luận..."
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  className="flex-1 bg-transparent outline-none text-sm p-2"
+                />
+                <label className="text-sm text-blue-500 cursor-pointer hover:underline">
+                  + Ảnh
+                  <input
+                    type="file"
+                    accept="image/*,video/*"
+                    hidden
+                    onChange={handleFileChange}
+                  />
+                </label>
+                <button
+                  type="submit"
+                  disabled={isSubmitting || (!content.trim() && !file)}
+                  className="text-blue-500 text-sm font-semibold hover:opacity-80 disabled:opacity-50"
+                >
+                  {isSubmitting ? "Đang gửi..." : "Gửi"}
+                </button>
+              </form>
+            </div>
+          </>
+        )}
+      </div>
+    </Modal>
+  );
 }

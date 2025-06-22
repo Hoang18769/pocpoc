@@ -22,17 +22,24 @@ const useAppStore = create(
     isLoadingChats: false,
     error: null,
 
+    // ✅ FIXED: Return Promise and handle errors properly
     fetchChatList: async () => {
       set({ isLoadingChats: true, error: null });
       try {
+        console.log('🚀 Fetching chat list from API...');
         const res = await api.get('/v1/chat');
-        const data = res.data.body;
+        console.log('📊 Chat API response:', res);
+        
+        const data = res.data.body || res.data || [];
         const conversationMap = new Map();
         const currentUserId = getCurrentUserId();
 
+        // ✅ Build conversation map
         data.forEach(chat => {
           const otherUser = chat.participants?.find(p => p.id !== currentUserId);
-          if (otherUser) conversationMap.set(otherUser.id, chat.id);
+          if (otherUser) {
+            conversationMap.set(otherUser.id, chat.id);
+          }
         });
 
         // ✅ Reverse the chat list when fetching
@@ -45,38 +52,55 @@ const useAppStore = create(
           error: null
         });
 
-        console.log(`📊 ${STORE_EVENTS.CHAT_LIST_LOAD}`,reversedData);
+        console.log(`✅ ${STORE_EVENTS.CHAT_LIST_LOAD} - ${reversedData.length} chats loaded`);
+        return reversedData; // ✅ Return data for component
       } catch (error) {
         console.error('❌ Error fetching chats:', error);
+        const errorMessage = error.response?.data?.message || error.message || 'Failed to load chats';
+        
         set({ 
           isLoadingChats: false, 
-          error: 'Failed to load chats' 
+          error: errorMessage,
+          chatList: [] // ✅ Reset on error
         });
+        
+        throw error; // ✅ Re-throw for component to handle
       }
     },
-// Trong store
-updateChatListAfterMessage: (chatId, lastMessage) => {
-  set((state) => ({
-    chatList: state.chatList.map(chat => 
-      chat.id === chatId 
-        ? { ...chat, lastMessage, updatedAt: new Date().toISOString() }
-        : chat
-    ).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
-  }));
-},
+
+    // ✅ FIXED: Better update logic
+    updateChatListAfterMessage: (chatId, lastMessage) => {
+      set((state) => ({
+        chatList: state.chatList.map(chat => 
+          (chat.id === chatId || chat.chatId === chatId)
+            ? { ...chat, lastMessage, updatedAt: new Date().toISOString() }
+            : chat
+        ).sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt))
+      }));
+    },
+
     getUserByChatId: (chatId) => {
-      const chat = get().chatList.find(c => c.id === chatId);
-      return chat ? chat.user : null;
+      const chat = get().chatList.find(c => (c.id === chatId || c.chatId === chatId));
+      return chat ? chat.target : null;
     },
 
     markChatAsRead: async (chatId) => {
-      set(state => ({
-        chatList: state.chatList.map(chat => 
-          (chat.chatId === chatId || chat.id === chatId)
-            ? { ...chat, notReadMessageCount: 0 }
-            : chat
-        )
-      }));   
+      try {
+        // ✅ Call API if needed
+        // await api.patch(`/v1/chat/${chatId}/read`);
+        
+        set(state => ({
+          chatList: state.chatList.map(chat => 
+            (chat.chatId === chatId || chat.id === chatId)
+              ? { ...chat, notReadMessageCount: 0 }
+              : chat
+          )
+        }));   
+        
+        console.log(`✅ Marked chat ${chatId} as read`);
+      } catch (error) {
+        console.error('❌ Error marking chat as read:', error);
+      }
     },
 
     onMessageReceived: (message, isCurrentChatOpen = false) => {
@@ -95,12 +119,12 @@ updateChatListAfterMessage: (chatId, lastMessage) => {
             }
             return chat;
           })
-          .sort((a, b) => new Date(a.updatedAt) - new Date(b.updatedAt)); // ✅ Sort ascending (oldest first)
+          .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));
 
         return { chatList: updatedChats };
       });
 
-      console.log(`📊 ${STORE_EVENTS.MESSAGE_RECEIVED} - ${message.chatId} (maintaining reverse order)`);
+      console.log(`📊 ${STORE_EVENTS.MESSAGE_RECEIVED} - ${message.chatId}`);
     },
 
     onChatCreated: (newChat) => {
@@ -108,14 +132,14 @@ updateChatListAfterMessage: (chatId, lastMessage) => {
       const otherUser = newChat.participants?.find(p => p.id !== currentUserId);
 
       set(state => ({
-        // ✅ Add new chat at the end (to maintain reverse chronological order)
-        chatList: [...state.chatList, newChat],
+        // ✅ Add new chat at the beginning (most recent)
+        chatList: [newChat, ...state.chatList],
         conversationMap: otherUser 
           ? new Map(state.conversationMap).set(otherUser.id, newChat.id)
           : state.conversationMap
       }));
 
-      console.log(`📊 ${STORE_EVENTS.CHAT_CREATED} - ${newChat.id} (added to end)`);
+      console.log(`📊 ${STORE_EVENTS.CHAT_CREATED} - ${newChat.id}`);
     },
 
     // ============ NOTIFICATIONS STATE ============
@@ -123,55 +147,49 @@ updateChatListAfterMessage: (chatId, lastMessage) => {
     isLoadingNotifications: false,
     unreadNotificationCount: 0,
 
+    // ✅ FIXED: Return Promise
     fetchNotifications: async (force = false, page = 0, size = 10) => {
       const { notifications, isLoadingNotifications } = get();
       
-      // Nếu đã có thông báo và không bắt buộc fetch lại, thì skip
       if (!force && notifications.length > 0) {
-        return;
+        return notifications;
       }
       
-      // Nếu đang loading, không fetch lại
       if (isLoadingNotifications) {
-        return;
+        return notifications;
       }
 
       set({ isLoadingNotifications: true, error: null });
       try {
+        console.log('🚀 Fetching notifications from API...');
         const res = await api.get('/v1/notifications', {
           params: { page, size }
         });
         
         console.log('📊 Notifications API response:', res);
         
-        // Xử lý response data giống như hook
         const responseData = res.data;
         let data = [];
         
         if (responseData) {
-          // Kiểm tra các cấu trúc response khác nhau
-         if (responseData.body && Array.isArray(responseData.body)) {
-            data = responseData.body; // Body response
+          if (responseData.body && Array.isArray(responseData.body)) {
+            data = responseData.body;
           } else if (Array.isArray(responseData)) {
-            data = responseData; // Direct array
+            data = responseData;
           }
         }
         
-        // ✅ FIX: Chỉ tính count khi không có notifications từ socket
         const currentNotifications = get().notifications;
         let finalNotifications = data;
         let unreadCount = 0;
         
         if (currentNotifications.length > 0) {
-          // ✅ Merge notifications từ API với notifications từ socket
-          // Tránh duplicate bằng cách filter theo ID
           const apiNotificationIds = new Set(data.map(n => n.id));
           const socketOnlyNotifications = currentNotifications.filter(n => !apiNotificationIds.has(n.id));
           
           finalNotifications = [...socketOnlyNotifications, ...data];
           unreadCount = finalNotifications.filter(n => !n.isRead).length;
         } else {
-          // ✅ Chỉ có notifications từ API
           unreadCount = data.filter(n => !n.isRead).length;
         }
         
@@ -182,14 +200,17 @@ updateChatListAfterMessage: (chatId, lastMessage) => {
           error: null
         });
 
-        console.log(`📊 ${STORE_EVENTS.NOTIFICATIONS_LOAD} - ${finalNotifications.length} notifications, ${unreadCount} unread`);
+        console.log(`✅ ${STORE_EVENTS.NOTIFICATIONS_LOAD} - ${finalNotifications.length} notifications, ${unreadCount} unread`);
         return finalNotifications;
       } catch (error) {
         console.error('❌ Error fetching notifications:', error);
+        const errorMessage = error.response?.data?.message || error.message || 'Failed to load notifications';
+        
         set({ 
           isLoadingNotifications: false,
-          error: 'Failed to load notifications' 
+          error: errorMessage
         });
+        
         throw error;
       }
     },
@@ -197,22 +218,17 @@ updateChatListAfterMessage: (chatId, lastMessage) => {
     onNotificationReceived: (notification) => {
       const { notifications } = get();
       
-      // ✅ FIX: Nếu danh sách rỗng, fetch song song nhưng vẫn xử lý notification từ socket
       if (notifications.length === 0) {
         console.log('📊 Empty notifications list, fetching from API...');
-        // Fetch song song, không return
-        get().fetchNotifications(true);
-        // Tiếp tục xử lý notification từ socket
+        get().fetchNotifications(true).catch(console.error);
       }
 
-      // ✅ Kiểm tra xem thông báo đã tồn tại chưa (tránh duplicate)
       const existingNotification = notifications.find(n => n.id === notification.id);
       if (existingNotification) {
         console.log(`📊 Notification ${notification.id} already exists, skipping...`);
         return;
       }
 
-      // ✅ Chỉ tăng count nếu notification chưa đọc
       set(state => ({
         notifications: [notification, ...state.notifications],
         unreadNotificationCount: !notification.isRead 
@@ -225,12 +241,11 @@ updateChatListAfterMessage: (chatId, lastMessage) => {
 
     markNotificationAsRead: async (notificationId) => {
       try {
-        // ✅ Kiểm tra notification có tồn tại và chưa đọc không
         const { notifications } = get();
         const notification = notifications.find(n => n.id === notificationId);
         
         if (!notification || notification.isRead) {
-          return; // Không cần update count
+          return;
         }
         
         set(state => ({
@@ -248,14 +263,11 @@ updateChatListAfterMessage: (chatId, lastMessage) => {
 
     markAllNotificationsAsRead: async () => {
       try {
-        // Gọi API để đánh dấu tất cả đã đọc trên server (nếu cần)
-        // await api.patch('/v1/notifications/read-all');
-        
         set(state => ({
           notifications: state.notifications.map(notification =>
             ({ ...notification, isRead: true })
           ),
-          unreadNotificationCount: 0 // ✅ Reset về 0
+          unreadNotificationCount: 0
         }));
       } catch (error) {
         console.error('❌ Error marking all notifications as read:', error);
@@ -278,9 +290,6 @@ updateChatListAfterMessage: (chatId, lastMessage) => {
 
     clearAllNotifications: async () => {
       try {
-        // Gọi API để xóa tất cả thông báo trên server (nếu cần)
-        // await api.delete('/v1/notifications');
-        
         set({ 
           notifications: [],
           unreadNotificationCount: 0
@@ -290,7 +299,6 @@ updateChatListAfterMessage: (chatId, lastMessage) => {
       }
     },
 
-    // ✅ Thêm method để sync count từ notifications array
     syncUnreadCount: () => {
       const { notifications } = get();
       const unreadCount = notifications.filter(n => !n.isRead).length;
@@ -307,14 +315,14 @@ updateChatListAfterMessage: (chatId, lastMessage) => {
       const { chatList } = get();
 
       const existingChat = chatList.find(chat => 
-        chat.target && chat.target.username === userInfo?.username
+        chat.target && (chat.target.username === userInfo?.username || chat.target.id === userId)
       );
 
       if (existingChat) {
-        console.log(`🚀 Navigating to existing chat: ${existingChat.chatId} with user: ${userId}`);
+        console.log(`🚀 Navigating to existing chat: ${existingChat.chatId || existingChat.id} with user: ${userId}`);
         return {
           type: 'existing',
-          chatId: existingChat.chatId,
+          chatId: existingChat.chatId || existingChat.id,
           userId: userId
         };
       } else {
@@ -383,8 +391,7 @@ updateChatListAfterMessage: (chatId, lastMessage) => {
     initializeApp: async () => {
       console.log('🚀 Initializing app...');
       try {
-        // Fetch both chats and notifications in parallel
-        await Promise.all([
+        await Promise.allSettled([
           get().fetchChatList(),
           get().fetchNotifications()
         ]);
@@ -397,35 +404,44 @@ updateChatListAfterMessage: (chatId, lastMessage) => {
 
     // ============ UTILITY ============
     clearAllData: () => {
-  set({
-    chatList: [],
-    conversationMap: new Map(),
-    selectedChatId: null,
-    virtualChatUser: null,
-    notifications: [],
-    unreadNotificationCount: 0,
-    error: null,
-    isLoadingChats: false,
-    isLoadingNotifications: false,
-  }, true); // 👈 Thêm `true` để notify devtools nếu đang dùng devtools middleware
-},
-
-
-    getChatByUserId: (userId) => get().conversationMap.get(userId),
-    getSelectedChat: () => {
-      const { selectedChatId, chatList } = get();
-      return chatList.find(chat => chat.id === selectedChatId) || null;
+      set({
+        chatList: [],
+        conversationMap: new Map(),
+        selectedChatId: null,
+        virtualChatUser: null,
+        notifications: [],
+        unreadNotificationCount: 0,
+        error: null,
+        isLoadingChats: false,
+        isLoadingNotifications: false,
+      }, false, 'clearAllData'); // ✅ Better devtools action name
     },
 
-    // ============ AUTO FETCH NOTIFICATIONS ============
+    getChatByUserId: (userId) => get().conversationMap.get(userId),
+    
+    getSelectedChat: () => {
+      const { selectedChatId, chatList } = get();
+      return chatList.find(chat => (chat.id === selectedChatId || chat.chatId === selectedChatId)) || null;
+    },
+
     ensureNotificationsLoaded: () => {
       const { notifications, isLoadingNotifications } = get();
       
-      // Nếu danh sách rỗng và không đang loading, tự động fetch
       if (notifications.length === 0 && !isLoadingNotifications) {
         console.log('📊 Auto-fetching notifications (empty list)...');
-        get().fetchNotifications(true);
+        get().fetchNotifications(true).catch(console.error);
       }
+    },
+
+    // ✅ NEW: Force refresh methods
+    refreshChatList: async () => {
+      console.log('🔄 Force refreshing chat list...');
+      return get().fetchChatList();
+    },
+
+    refreshNotifications: async () => {
+      console.log('🔄 Force refreshing notifications...');
+      return get().fetchNotifications(true);
     },
 
   }), {
@@ -433,8 +449,12 @@ updateChatListAfterMessage: (chatId, lastMessage) => {
   })
 );
 
+// ✅ FIXED: Better getCurrentUserId with fallback
 function getCurrentUserId() {
-  return localStorage.getItem('userId') || null;
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem('userId') || sessionStorage.getItem('userId') || null;
+  }
+  return null;
 }
 
 export default useAppStore;

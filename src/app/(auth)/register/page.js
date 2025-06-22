@@ -11,8 +11,8 @@ import MotionContainer from "@/components/ui-components/MotionContainer"
 import Button from "@/components/ui-components/Button"
 import Connectimg from "@/assests/photo/Connect.jpg"
 import Link from "next/link"
-import api from "@/utils/axios"
-import { jwtDecode } from "jwt-decode";
+import api, { setAuthToken } from "@/utils/axios"
+import { jwtDecode } from "jwt-decode"
 import axios from "axios"
 
 export default function AuthPage() {
@@ -26,7 +26,7 @@ export default function AuthPage() {
   const [birthdate, setBirthdate] = useState("")
   const formRef = useRef(null)
   const { theme } = useTheme()
-  const searchParams = useSearchParams()
+  const searchParams = useSearchParams();
   const router = useRouter()
   const [verifyMessage, setVerifyMessage] = useState("")
   const [verifying, setVerifying] = useState(false)
@@ -44,7 +44,6 @@ export default function AuthPage() {
     }
   }
 
-  // Xác thực email tự động khi có param trong URL
   useEffect(() => {
     const verifyEmail = async () => {
       const emailParam = searchParams.get("email")
@@ -121,22 +120,59 @@ export default function AuthPage() {
         if (res.data.code === 200) {
           if (res.data.body.token) {           
             const token = res.data.body.token;
-            console.log(token)
-            localStorage.setItem("accessToken", token);
+            console.log('🔐 Login success, token:', token.substring(0, 20) + '...');
+            
             const decoded = jwtDecode(token);
-            console.log(decoded)
-            localStorage.setItem("userId",decoded.sub);
-            localStorage.setItem("userName",decoded.username );
-
+            console.log('🔓 Decoded token:', decoded);
+            
+            // ✅ Step 1: Set localStorage (giữ nguyên như cũ)
+            localStorage.setItem("accessToken", token);
+            localStorage.setItem("userId", decoded.sub);
+            localStorage.setItem("userName", decoded.username);
+            
+            // ✅ Step 2: THÊM - Sync lên cookies bằng setAuthToken
+            console.log('📝 Syncing to cookies...');
+            const syncSuccess = setAuthToken(token, decoded.sub, decoded.username);
+            
+            if (syncSuccess) {
+              console.log('✅ Cookies synced successfully');
+              
+              // ✅ Step 3: Verify
+              setTimeout(() => {
+                console.log('🔍 Final verification:', {
+                  localStorage: {
+                    accessToken: !!localStorage.getItem('accessToken'),
+                    userId: localStorage.getItem('userId'),
+                    userName: localStorage.getItem('userName')
+                  },
+                  cookies: {
+                    accessToken: document.cookie.includes('accessToken='),
+                    userId: document.cookie.includes('userId='),
+                    userName: document.cookie.includes('userName='),
+                    raw: document.cookie
+                  }
+                });
+              }, 200);
+              
+              setMessage("✅ Đăng nhập thành công!")
+              setEmail("")
+              setPassword("")
+              
+              // ✅ Step 4: Redirect
+              setTimeout(() => {
+                window.location.href = '/index';
+              }, 500);
+              
+            } else {
+              console.error('❌ Failed to sync cookies');
+              setMessage("⚠️ Đăng nhập thành công nhưng có lỗi khi đồng bộ hóa phiên làm việc")
+              
+              // Fallback redirect sau khi hiển thị thông báo
+              setTimeout(() => {
+                router.push("/index")
+              }, 1200)
+            }
           }
-          //console.log(res.data)
-          setMessage("✅ Đăng nhập thành công!")
-          setEmail("")
-          setPassword("")
-          // Delay để người dùng thấy thông báo trước khi chuyển trang
-          setTimeout(() => {
-            router.push("/index")
-          }, 1200)
         }
       } catch (error) {
         setMessage(`❌ Đăng nhập thất bại: ${parseApiError(error)}`)
@@ -215,7 +251,9 @@ export default function AuthPage() {
                     {message && (
                       <div
                         className={`p-3 text-sm rounded mb-4 ${
-                          message.includes("✅") ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                          message.includes("✅") ? "bg-green-100 text-green-800" : 
+                          message.includes("⚠️") ? "bg-yellow-100 text-yellow-800" :
+                          "bg-red-100 text-red-800"
                         }`}
                       >
                         {message}
@@ -318,16 +356,16 @@ export default function AuthPage() {
                         {loading ? "Loading..." : mode === "login" ? "Sign in" : "Register"}
                       </Button>
                       <div className="mt-6 text-center text-sm text-muted-foreground">
-                      <div>
-                        Quên mật khẩu?{" "}
-                        <Link
-                          href="/forgot-password"
-                          className="text-blue-500 dark:text-blue-400 hover:underline"
-                        >
-                          Tạo mật khẩu mới
-                        </Link>
+                        <div>
+                          Quên mật khẩu?{" "}
+                          <Link
+                            href="/forgot-password"
+                            className="text-blue-500 dark:text-blue-400 hover:underline"
+                          >
+                            Tạo mật khẩu mới
+                          </Link>
+                        </div>
                       </div>
-                    </div>
                     </form>
                   </MotionContainer>
                 </AnimatePresence>

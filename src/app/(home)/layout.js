@@ -14,6 +14,7 @@ import ChatList from "@/components/social-app-component/ChatList";
 import { SocketProvider } from "@/context/socketContext";
 import useNotificationSocket from "@/hooks/useNotificationSocket";
 import useMessageNotification from "@/hooks/useMessageNotification";
+import { AuthProvider } from '@/hooks/useAuth'
 
 export default function MainLayout({ children }) {
   const { resolvedTheme } = useTheme();

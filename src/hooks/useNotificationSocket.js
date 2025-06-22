@@ -60,55 +60,63 @@ export default function useNotificationSocket(userId) {
           toast(`${name} đã trả lời bình luận của bạn 💬`);
           break;
 
-       case "NEW_MESSAGE": {
-  toast(`${name} đã nhắn tin cho bạn 💬`);
-  try {
-    if (!data.message || !data.message.senderUsername) break;
+        case "NEW_MESSAGE": {
+          toast(`${name} đã nhắn tin cho bạn 💬`);
+          try {
+            if (!data.message || !data.message.senderUsername) break;
 
-    const senderUsername = data.message.senderUsername;
+            const senderUsername = data.message.senderUsername;
 
-    // Truy xuất chatList từ store
-    const { chatList } = useAppStore.getState();
+            // Truy xuất chatList từ store
+            const { chatList } = useAppStore.getState();
 
-    const foundChat = chatList.find(
-      (chat) => chat.target?.username === senderUsername
-    );
+            const foundChat = chatList.find(
+              (chat) => chat.target?.username === senderUsername
+            );
 
-    if (foundChat) {
-      const updatedChat = {
-        ...foundChat,
-        lastMessage: {
-          ...foundChat.lastMessage,
-          body: data.message.body,
-        },
-        updatedAt: data.message.createdAt || new Date().toISOString(),
-        notReadMessageCount: (foundChat.notReadMessageCount || 0) + 1,
-      };
+            if (foundChat) {
+              const updatedChat = {
+                ...foundChat,
+                lastMessage: {
+                  ...foundChat.lastMessage,
+                  body: data.message.body,
+                },
+                updatedAt: data.message.createdAt || new Date().toISOString(),
+                notReadMessageCount: (foundChat.notReadMessageCount || 0) + 1,
+              };
 
-      // Tạo chatList mới: chat này đứng đầu, còn lại giữ nguyên nhưng sắp theo updatedAt
-      const newChatList = [
-        updatedChat,
-        ...chatList
-          .filter((chat) => chat.id !== foundChat.id)
-          .sort((a, b) => new Date(a.updatedAt) - new Date(b.updatedAt)),
-      ];
+              // Tạo chatList mới: chat này đứng đầu, còn lại giữ nguyên nhưng sắp theo updatedAt
+              const newChatList = [
+                updatedChat,
+                ...chatList
+                  .filter((chat) => chat.id !== foundChat.id)
+                  .sort(
+                    (a, b) => new Date(a.updatedAt) - new Date(b.updatedAt)
+                  ),
+              ];
 
-      useAppStore.setState({ chatList: newChatList });
+              useAppStore.setState({ chatList: newChatList });
 
-      console.log("📥 Cập nhật chatList với NEW_MESSAGE từ", senderUsername);
-    } else {
-      console.log("🔍 Không tìm thấy chat với", senderUsername, "- giữ nguyên danh sách.");
-    }
+              console.log(
+                "📥 Cập nhật chatList với NEW_MESSAGE từ",
+                senderUsername
+              );
+            } else {
+              console.log(
+                "🔍 Không tìm thấy chat với",
+                senderUsername,
+                "- giữ nguyên danh sách."
+              );
+            }
 
-    // Optionally gọi lại onMessageReceived để cập nhật nếu bạn vẫn muốn
-    useAppStore.getState().onMessageReceived(data.message);
-  } catch (err) {
-    console.error("❌ Failed to process NEW_MESSAGE:", err);
-  }
+            // Optionally gọi lại onMessageReceived để cập nhật nếu bạn vẫn muốn
+            useAppStore.getState().onMessageReceived(data.message);
+          } catch (err) {
+            console.error("❌ Failed to process NEW_MESSAGE:", err);
+          }
 
-  break;
-}
-
+          break;
+        }
 
         case "NEW_CHAT_CREATED":
           if (data.chat) {
@@ -187,5 +195,12 @@ export default function useNotificationSocket(userId) {
         clientRef.current = null;
       }
     };
-  }, [userId, fetchChatList, onMessageReceived, onChatCreated, fetchNotifications, onNotificationReceived]);
+  }, [
+    userId,
+    fetchChatList,
+    onMessageReceived,
+    onChatCreated,
+    fetchNotifications,
+    onNotificationReceived,
+  ]);
 }

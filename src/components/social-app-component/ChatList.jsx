@@ -1,15 +1,17 @@
 "use client";
 import { usePathname } from "next/navigation";
-import { ChevronDown, ChevronUp, SearchIcon } from "lucide-react";
+import { ChevronDown, ChevronUp, SearchIcon, RefreshCw } from "lucide-react";
 import ChatItem from "./ChatItem";
 import Input from "../ui-components/Input";
 import Avatar from "../ui-components/Avatar";
 import { useEffect, useRef, useState } from "react";
 import api from "@/utils/axios";
 import useAppStore from "@/store/ZustandStore";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function ChatList({ onSelectChat, selectedChatId }) {
   const pathname = usePathname();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   
   // Zustand store
   const { 
@@ -17,6 +19,7 @@ export default function ChatList({ onSelectChat, selectedChatId }) {
     isLoadingChats, 
     fetchChatList,
     markChatAsRead,
+    refreshChatList, // ✅ New refresh method
     error: storeError 
   } = useAppStore();
   
@@ -24,30 +27,53 @@ export default function ChatList({ onSelectChat, selectedChatId }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [searchResults, setSearchResults] = useState(null);
   const [isSearching, setIsSearching] = useState(false);
+  const [fetchAttempted, setFetchAttempted] = useState(false); // ✅ Track fetch attempts
   const listRef = useRef(null);
 
   const isChatsPage = pathname === "/chats";
 
-  // Debug: Log để kiểm tra dữ liệu từ API
+  // Debug logging
   useEffect(() => {
-    console.log("🔍 ChatList Debug - Current chatList:", chatList);
-    chatList.forEach((chat, index) => {
-      console.log(`Chat ${index}:`, {
-        id: chat.chatId || chat.id,
-        target: chat.target?.displayName || chat.target?.username,
-        notReadMessageCount: chat.notReadMessageCount,
-        lastMessage: chat.lastMessage?.content?.substring(0, 50)
-      });
+    console.log("🔍 ChatList Debug:", {
+      chatListLength: chatList.length,
+      isAuthenticated,
+      authLoading,
+      isLoadingChats,
+      fetchAttempted,
+      storeError
     });
-  }, [chatList]);
+  }, [chatList.length, isAuthenticated, authLoading, isLoadingChats, fetchAttempted, storeError]);
 
-  // Fetch data on mount if store is empty
+  // ✅ MAIN FETCH LOGIC - Trigger when user becomes authenticated
   useEffect(() => {
-    if (chatList.length === 0 && !isLoadingChats) {
-      console.log("🚀 Fetching chat list...");
-      fetchChatList();
+    const shouldFetch = 
+      isAuthenticated && 
+      !authLoading && 
+      !fetchAttempted &&
+      typeof fetchChatList === 'function';
+
+    if (shouldFetch) {
+      console.log("🚀 Fetching chat list after authentication...");
+      setFetchAttempted(true);
+      
+      fetchChatList()
+        .then((data) => {
+          console.log("✅ Chat list fetched successfully:", data?.length || 0, "chats");
+        })
+        .catch((error) => {
+          console.error("❌ Failed to fetch chat list:", error);
+          // Reset on error to allow retry
+          setFetchAttempted(false);
+        });
     }
-  }, [chatList.length, isLoadingChats, fetchChatList]);
+  }, [isAuthenticated, authLoading, fetchAttempted, fetchChatList]);
+
+  // ✅ Reset fetch attempt when auth state changes
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setFetchAttempted(false);
+    }
+  }, [isAuthenticated]);
 
   // Auto-expand on chats page
   useEffect(() => {
@@ -56,13 +82,17 @@ export default function ChatList({ onSelectChat, selectedChatId }) {
 
   // Scroll to bottom on new messages
   useEffect(() => {
-    if (listRef.current) {
+    if (listRef.current && chatList.length > 0) {
       listRef.current.scrollTop = listRef.current.scrollHeight;
     }
   }, [chatList]);
 
+  // ✅ Improved chat selection handler
   const handleChatSelect = async (chat) => {
-    // Use consistent field name - check store structure first
+    if (!isAuthenticated || typeof markChatAsRead !== 'function') {
+      return;
+    }
+
     const chatId = chat.chatId || chat.id;
     
     console.log("🎯 Selecting chat:", { 
@@ -70,16 +100,34 @@ export default function ChatList({ onSelectChat, selectedChatId }) {
       currentNotReadCount: chat.notReadMessageCount 
     });
     
-    // Call store's markChatAsRead to update store state
-    await markChatAsRead(chatId);
+    try {
+      await markChatAsRead(chatId);
+      onSelectChat(chatId, chat.target);
+    } catch (error) {
+      console.error("❌ Error selecting chat:", error);
+    }
+  };
+
+  // ✅ Manual refresh handler
+  const handleRefresh = async () => {
+    if (!isAuthenticated || typeof refreshChatList !== 'function') {
+      return;
+    }
+
+    console.log("🔄 Manual refresh triggered");
+    setFetchAttempted(false); // Reset to allow new fetch
     
-    // Notify parent component
-    onSelectChat(chatId, chat.target);
+    try {
+      await refreshChatList();
+      console.log("✅ Manual refresh completed");
+    } catch (error) {
+      console.error("❌ Manual refresh failed:", error);
+    }
   };
 
   // Debounced search API call
   useEffect(() => {
-    if (!searchTerm) {
+    if (!searchTerm || !isAuthenticated) {
       setSearchResults(null);
       return;
     }
@@ -90,7 +138,7 @@ export default function ChatList({ onSelectChat, selectedChatId }) {
         const res = await api.get(`/v1/chat/search`, {
           params: { query: searchTerm },
         });
-        setSearchResults(res.data.body);
+        setSearchResults(res.data.body || res.data || []);
       } catch (err) {
         console.error("Search failed:", err);
         setSearchResults([]);
@@ -100,24 +148,45 @@ export default function ChatList({ onSelectChat, selectedChatId }) {
     }, 1000);
 
     return () => clearTimeout(timeout);
-  }, [searchTerm]);
+  }, [searchTerm, isAuthenticated]);
+
+  // ✅ Show loading while checking auth
+  if (authLoading) {
+    return (
+      <div className="space-y-3 p-4 animate-pulse">
+        <div className="h-8 bg-muted rounded-lg w-1/2" />
+        {[...Array(3)].map((_, i) => (
+          <div key={i} className="h-14 bg-muted rounded-lg" />
+        ))}
+      </div>
+    );
+  }
+
+  // ✅ Don't render if not authenticated
+  if (!isAuthenticated) {
+    return null;
+  }
 
   const filteredChats = searchResults ?? chatList;
 
-  // Fix unique chats logic - use consistent field
+  // Create unique chats for collapsed view
   const uniqueChats = [
     ...new Map(
       chatList.map(chat => [
-        chat.target?.userId || chat.target?.id, 
+        chat.target?.userId || chat.target?.id || chat.target?.username, 
         chat
       ])
     ).values(),
   ];
 
-  // Loading state
-  if (isLoadingChats && chatList.length === 0) {
+  // ✅ Show loading state when fetching
+  if (isLoadingChats) {
     return (
       <div className="space-y-3 p-4 animate-pulse">
+        <div className="flex items-center justify-between">
+          <div className="h-6 bg-muted rounded w-1/3" />
+          <div className="h-6 w-6 bg-muted rounded" />
+        </div>
         {[...Array(5)].map((_, i) => (
           <div key={i} className="h-14 bg-muted rounded-lg" />
         ))}
@@ -125,25 +194,45 @@ export default function ChatList({ onSelectChat, selectedChatId }) {
     );
   }
 
-  // Error state
+  // ✅ Enhanced error state with retry
   if (storeError) {
     return (
-      <div className="p-4 text-center text-sm text-destructive">
-        Failed to load chats. Please try again.
+      <div className="p-4 text-center text-sm">
+        <div className="text-destructive mb-2">
+          Failed to load chats
+        </div>
+        <div className="text-muted-foreground text-xs mb-3">
+          {storeError}
+        </div>
+        <button 
+          onClick={handleRefresh}
+          disabled={isLoadingChats}
+          className="flex items-center gap-2 mx-auto px-3 py-1.5 text-primary hover:bg-primary/10 rounded-md transition-colors disabled:opacity-50"
+        >
+          <RefreshCw className={`h-4 w-4 ${isLoadingChats ? 'animate-spin' : ''}`} />
+          {isLoadingChats ? 'Retrying...' : 'Try again'}
+        </button>
       </div>
     );
   }
 
-  // Empty state
-  if (!isLoadingChats && chatList.length === 0) {
+  // ✅ Enhanced empty state
+  if (!isLoadingChats && chatList.length === 0 && fetchAttempted) {
     return (
       <div className="p-4 text-center text-muted-foreground">
-        No conversations yet
+        <div className="mb-2">No conversations yet</div>
+        <button 
+          onClick={handleRefresh}
+          className="flex items-center gap-2 mx-auto px-3 py-1.5 text-primary hover:bg-primary/10 rounded-md transition-colors text-sm"
+        >
+          <RefreshCw className="h-4 w-4" />
+          Refresh
+        </button>
       </div>
     );
   }
 
-  // Collapsed state - more compact on mobile
+  // Collapsed state
   if (!expanded && !isChatsPage) {
     return (
       <div
@@ -179,23 +268,33 @@ export default function ChatList({ onSelectChat, selectedChatId }) {
     );
   }
 
-  // Expanded state - more compact on mobile
+  // Expanded state
   return (
     <div className="w-full md:max-w-md mx-auto bg-background flex flex-col border rounded-lg overflow-hidden h-full shadow-sm">
       {!isChatsPage && (
         <div className="flex items-center justify-between p-2 md:p-3 border-b">
           <h3 className="font-medium text-xs md:text-sm">Messages</h3>
-          <button
-            onClick={() => setExpanded(false)}
-            className="text-muted-foreground hover:text-foreground transition-colors"
-            aria-label="Collapse chat list"
-          >
-            <ChevronUp className="h-4 w-4 md:h-5 md:w-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleRefresh}
+              disabled={isLoadingChats}
+              className="text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+              aria-label="Refresh chats"
+            >
+              <RefreshCw className={`h-4 w-4 ${isLoadingChats ? 'animate-spin' : ''}`} />
+            </button>
+            <button
+              onClick={() => setExpanded(false)}
+              className="text-muted-foreground hover:text-foreground transition-colors"
+              aria-label="Collapse chat list"
+            >
+              <ChevronUp className="h-4 w-4 md:h-5 md:w-5" />
+            </button>
+          </div>
         </div>
       )}
 
-      {/* Search bar - hidden on mobile to save space */}
+      {/* Search bar */}
       <div className="px-2 md:px-3 py-1 md:py-2 border-b hidden md:block">
         <div className="relative">
           <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -223,13 +322,11 @@ export default function ChatList({ onSelectChat, selectedChatId }) {
                   selected={selectedChatId === (chat.chatId || chat.id)}
                   onClick={() => handleChatSelect(chat)}
                 />
-                {/* Debug info - remove after fixing */}
-                
               </div>
             ))
         ) : (
           <div className="p-2 md:p-4 text-center text-muted-foreground text-xs md:text-sm">
-            {isSearching ? "Searching..." : "No matches found"}
+            {isSearching ? "Searching..." : searchTerm ? "No matches found" : "No chats available"}
           </div>
         )}
       </div>
