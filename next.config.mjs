@@ -17,18 +17,6 @@ const nextConfig = {
         port: '80',
         pathname: '/v1/files/**',
       },
-      {
-        protocol: 'https',
-        hostname: 'localhost',
-        port: '443', 
-        pathname: '/v1/files/**',
-      },
-      // Add your production API domain here
-      // {
-      //   protocol: 'https',
-      //   hostname: 'your-api-domain.com',
-      //   pathname: '/v1/files/**',
-      // }
     ],
     // Optimize for performance
     formats: ['image/webp', 'image/avif'],
@@ -43,13 +31,16 @@ const nextConfig = {
 
   // Experimental features - more stable options
   experimental: {
-    nodeMiddleware: true, 
+    nodeMiddleware: true,
     esmExternals: true,
+    // Enable app directory if you're using it
+    // appDir: true,
   },
 
   // Output configuration for deployment
   output: 'standalone', // Better for Docker/container deployments
   
+  // Environment variables
   env: {
     CUSTOM_KEY: process.env.CUSTOM_KEY,
   },
@@ -114,6 +105,7 @@ const nextConfig = {
     ];
   },
 
+  // Rewrites for API routes or proxying
   async rewrites() {
     return [
       // Add any URL rewrites here

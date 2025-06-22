@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 
-export function middleware(request) {
+export default function middleware(request) {
   // Tạm thời chỉ log và return next để test
   console.log('Middleware running for:', request.nextUrl.pathname);
   return NextResponse.next();
