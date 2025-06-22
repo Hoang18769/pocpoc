@@ -43,16 +43,13 @@ const nextConfig = {
 
   // Experimental features - more stable options
   experimental: {
-    // More stable than 'loose'
+    nodeMiddleware: true, 
     esmExternals: true,
-    // Enable app directory if you're using it
-    // appDir: true,
   },
 
   // Output configuration for deployment
   output: 'standalone', // Better for Docker/container deployments
   
-  // Environment variables
   env: {
     CUSTOM_KEY: process.env.CUSTOM_KEY,
   },
@@ -117,7 +114,6 @@ const nextConfig = {
     ];
   },
 
-  // Rewrites for API routes or proxying
   async rewrites() {
     return [
       // Add any URL rewrites here
