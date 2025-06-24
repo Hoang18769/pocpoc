@@ -15,7 +15,7 @@ export default function RootPage() {
   // Check authentication and redirect accordingly
   if (token && userId) {
     // User is authenticated, redirect to index
-    redirect('/index')
+    redirect('/home')
   } else {
     // User is not authenticated, redirect to register
     redirect('/register')
