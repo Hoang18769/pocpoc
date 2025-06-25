@@ -14,8 +14,7 @@ import ChatList from "@/components/social-app-component/ChatList";
 import { SocketProvider } from "@/context/socketContext";
 import useNotificationSocket from "@/hooks/useNotificationSocket";
 import useMessageNotification from "@/hooks/useMessageNotification";
-import { AuthProvider } from '@/hooks/useAuth'
-
+import useOnlineNotification from "@/hooks/useOnlineNotification";
 export default function MainLayout({ children }) {
   const { resolvedTheme } = useTheme();
   const pathname = usePathname();
@@ -40,7 +39,6 @@ export default function MainLayout({ children }) {
   // ✅ Sử dụng hook message notification mới
     useMessageNotification(userId);
     useNotificationSocket(userId, token);
-
   // ✅ Listen for new message events để có thể auto-open chat nếu cần
 useEffect(() => {
   const handleNewMessage = (event) => {
